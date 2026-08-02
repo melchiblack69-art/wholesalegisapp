@@ -3,7 +3,7 @@
 // uploadToCloudinary() streams the Buffer directly to Cloudinary.
 
 const multer     = require('multer');
-const cloudinary = require('../config/Cloudinary');
+const cloudinary = require('../config/cloudinary');
 const { Readable } = require('stream');
 
 // ── multer — memory storage, 5 MB limit, images only ─────────────────────
