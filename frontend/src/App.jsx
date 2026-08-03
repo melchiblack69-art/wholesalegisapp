@@ -58,7 +58,7 @@ export default function App() {
           <Route path="/users" element={<ProtectedRoute roles={["super_admin"]}><Users /></ProtectedRoute>} />
           <Route path="/settings"  element={<Settings />} />
           <Route path="/company/:id/settings" element={<CompanySettings />} />
-          <Route path="*" element={<Dashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </>

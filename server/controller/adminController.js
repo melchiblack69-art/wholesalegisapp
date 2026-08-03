@@ -537,7 +537,7 @@ exports.getMe = async (req, res) => {
       [req.auth?.id],
     );
     if (!rows.length)
-      return res.status(404).json({ message: "Admin not found" });
+      return res.status(404).json({ message: "User not found" });
 
     res.json(rows[0]);
   } catch (err) {

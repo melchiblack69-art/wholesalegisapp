@@ -26,7 +26,7 @@ export default function Login() {
      const interval = setInterval(getSystemDetail, 15000); // refresh every 15s
      return () => clearInterval(interval);
    }, []);
-   
+
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const onSubmit = async (e) => {
@@ -48,7 +48,7 @@ export default function Login() {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="d-flex align-items-center gap-2 mb-4">
-          <span className="icon-circle bg-primary-brand text-white" style={{ width: 44, height: 44 }}>
+          <span className="icon-circle bg-primary-brand text-white" style={{ width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center",borderRadius: "50%" }}>
             <img src={ systemDetail?.system_logo|| logo} alt="North Industrial Area Wholesale Locator" className="sidebar-logo" />
           </span>
           <div className="d-flex flex-column lh-1">
