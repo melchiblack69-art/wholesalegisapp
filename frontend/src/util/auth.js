@@ -13,3 +13,16 @@ export const isTokenExpired = (token) => {
         return true;
     }
 };
+
+import { useLoading } from "../hooks/useLoading";
+
+const { showLoading, hideLoading } = useLoading();
+
+const doSomething = async () => {
+  showLoading("Saving...");
+  try {
+    // work
+  } finally {
+    hideLoading();
+  }
+};

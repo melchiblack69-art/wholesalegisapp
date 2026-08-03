@@ -1,7 +1,8 @@
 // Central place that talks to your Express API.
 // Set VITE_API_URL in a .env file, e.g. VITE_API_URL=https://your-api.onrender.com/api
 export const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
-console.log("API base URL:", BASE_URL);
+import { showGlobalLoading, hideGlobalLoading } from "../util/loadBus"; // adjust path if you keep loadingBus in utils/
+
 
 const TOKEN_KEY = "admin_token";
 
@@ -41,10 +42,13 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
   });
 
   let data = null;
+  showGlobalLoading();
   try {
     data = await res.json();
   } catch {
     // No JSON response (e.g. empty body, 204, or HTML error page)
+  }finally{
+  hideGlobalLoading();
   }
 
   if (!res.ok) {

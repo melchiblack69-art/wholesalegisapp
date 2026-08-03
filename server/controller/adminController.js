@@ -135,7 +135,7 @@ LIMIT 1`,
     });
   } catch (err) {
     console.error("login error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ message: "Server Error", error: err.message });
   }
 };
 
