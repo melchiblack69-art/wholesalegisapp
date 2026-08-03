@@ -12,7 +12,8 @@ const checkMaintenance = async (req, res, next) => {
 if (
   req.originalUrl.startsWith("/uploads") ||
   req.originalUrl.startsWith("/api/auth/forgot-password") ||
-  req.originalUrl.startsWith("/api/auth/reset-password")
+  req.originalUrl.startsWith("/api/auth/reset-password")  ||
+  req.originalUrl.startsWith("/api/system/sys-details")
 ) {
   return next();
 }
@@ -23,12 +24,13 @@ if (
     );
 
     if (rows.length && Number(rows[0].maintenance_mode) === 1) {
+      console.log("[Maintenance Mode: ] - ON");
       return res.status(503).json({
         maintenance: true,
         message: "The system is currently under maintenance. Please try again later."
       });
     }
-
+console.log("[Maintenance Mode: ] - OFF");
     next();
 
   } catch (err) {

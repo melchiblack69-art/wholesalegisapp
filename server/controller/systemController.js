@@ -211,11 +211,11 @@ exports.deleteLogo = async (req, res) => {
 
     const publicId = extractPublicId(rows[0].system_logo);
 
-    // Clear from DB first
-    await db.query(`UPDATE system_details SET system_logo = NULL WHERE id = ?`, [id]);
-
-    // Then delete from Cloudinary
+    // Delete from Cloudinary
     if (publicId) await deleteFromCloudinary(publicId);
+
+    //Then clear the system_logo field in the database
+    await db.query(`UPDATE system_details SET system_logo = NULL WHERE id = ?`, [id]);
 
     // Return updated user
     const [updated] = await db.query(
