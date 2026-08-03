@@ -51,6 +51,7 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
     // Maintenance Mode
     if (res.status === 503 && data?.maintenance) {
       if (window.location.pathname !== "/maintenance") {
+        console.log( "Maintenace Mode: ", window.location.pathname);
         window.location.href = "/maintenance";
       }
       throw new Error(data?.message || "The system is under maintenance.");
