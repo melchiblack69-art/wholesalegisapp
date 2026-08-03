@@ -12,7 +12,7 @@ const {
  } = require("../controller/systemController");
  const {upload} = require("../middleware/upload");
 
-router.get("/system-details", protect,checkMaintenance, getSystemDetails);
+//router.get("/system-details", protect,checkMaintenance, getSystemDetails);
 router.get("/database-size", protect,checkMaintenance, getDatabaseSize);
 router.post("/system-details", protect,checkMaintenance, addSystemDetails);
 router.delete('/logo/:id', protect,           checkMaintenance,              deleteLogo);

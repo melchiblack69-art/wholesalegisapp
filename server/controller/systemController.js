@@ -234,7 +234,7 @@ exports.deleteLogo = async (req, res) => {
 exports.getSystemDetail = async (req, res) =>{
   try {
     const [rows] = await db.query(
-      "SELECT id, system_name, other_name, system_email, system_logo FROM system_details LIMIT 1"
+      "SELECT * FROM system_details LIMIT 1"
     );
 
     if (!rows.length) {

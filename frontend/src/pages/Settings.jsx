@@ -4,7 +4,9 @@ import Avatar from "../components/Avatar";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
-import {useModal} from "../context/ModalContext";
+import { useModal } from "../context/ModalContext";
+import { useSystemSettings } from "../context/SystemSettingsContext";
+import LoaderSpinner from "../components/LoadingSpinner";
 
 const tabs = ["Profile", "Change Password", "System Settings"];
 
@@ -282,6 +284,7 @@ function SystemLogoUploader({
 
 export default function Settings() {
   const { openSidebar } = useSidebar();
+  const systemCtx = useSystemSettings();
   const [tab, setTab] = useState("Profile");
   const { user, updateCurrentUser } = useAuth();
   const [saving, setSaving] = useState(false);
@@ -297,22 +300,11 @@ export default function Settings() {
   });
   const logoInputRef = useRef(null);
 
-  const [system, setSystem] = useState({
-    id: "",
-    system_name: "",
-    other_name: "",
-    system_logo: "",
-    system_email: "",
-    maintenance_mode: false,
-    description: "",
-    updated_at: "",
-  });
-
   const [systemLogo, setSystemLogo] = useState(null);
   const [systemLogoPreview, setSystemLogoPreview] = useState(null);
   const [editingSystemField, setEditingSystemField] = useState(null);
   const [savingSystem, setSavingSystem] = useState(false);
-
+  const [system, setSystem] = useState();
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -325,7 +317,6 @@ export default function Settings() {
     next: false,
     confirm: false,
   });
-  
 
   const updateSystemField = (field, value) => {
     setSystem((prev) => ({
@@ -334,34 +325,9 @@ export default function Settings() {
     }));
   };
 
-  const loadSystemDetails = async () => {
-    try {
-      const data = await api.get("/api/system/system-details");
-
-  const next =  {
-        id: data.id,
-        system_name: data.system_name || "",
-        other_name: data.other_name || "",
-        system_logo: data.system_logo || "",
-        system_email: data.system_email || "",
-        maintenance_mode: !!data.maintenance_mode,
-        description: data.description || "",
-        updated_at: data.updated_at || "",
-      };
-      setSystem(next);
-      return next;
-
-    } catch (err) {
-      console.log(err);
-    }
-  };
-
-  const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
   const handlePwd = (f) => (e) =>
     setPwd((p) => ({ ...p, [f]: e.target.value }));
   const toggleShow = (f) => () => setShowPwd((p) => ({ ...p, [f]: !p[f] }));
-  
-
 
   useEffect(() => {
     if (!user?.id) return;
@@ -389,12 +355,24 @@ export default function Settings() {
             email: user?.email ?? "",
             phone: user?.phone ?? "",
           });
-          showModal("Could not load profile details.", { type: "error", title: "Error",
-             autoClose: true, autoCloseDelay: 2000, confirmText: false });
+          showModal("Could not load profile details.", {
+            type: "error",
+            title: "Error",
+            autoClose: true,
+            autoCloseDelay: 2000,
+            confirmText: false,
+          });
         }
       })
-      .catch((error) => showModal(error.message || "Could not load profile details.", { type: "error", title: "Error", autoClose: true,
-         autoCloseDelay: 2000, confirmText: false }));
+      .catch((error) =>
+        showModal(error.message || "Could not load profile details.", {
+          type: "error",
+          title: "Error",
+          autoClose: true,
+          autoCloseDelay: 2000,
+          confirmText: false,
+        }),
+      );
   }, [user?.id, user?.name, user?.username, user?.email, user?.phone]);
 
   useEffect(
@@ -419,12 +397,23 @@ export default function Settings() {
       console.error(e);
     }
   };
-  // FETCH SYSTEM DETAILS — used by both the Profile info card and the
-  // System Settings tab, so it's loaded once here.
+
   useEffect(() => {
-    loadSystemDetails();
     getDbSize();
-  }, []);
+    if (!systemCtx?.loaded) return;
+    setSystem({
+      id: systemCtx.id,
+      system_name: systemCtx.system_name,
+      other_name: systemCtx.other_name,
+      system_logo: systemCtx.system_logo,
+      system_email: systemCtx.system_email,
+      maintenance_mode: systemCtx.maintenance_mode,
+      description: systemCtx.description,
+      updated_at: systemCtx.updated_at,
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemCtx?.loaded, systemCtx?.updated_at]);
 
   const saveSystemDetails = async () => {
     try {
@@ -454,20 +443,24 @@ export default function Settings() {
       setSystemLogoPreview(null);
       if (logoInputRef.current) logoInputRef.current.value = "";
 
-         const updated =   await loadSystemDetails();
+      const fresh = await systemCtx.refresh(); // re-fetches once, updates context everywhere
+      if (fresh) setSystem(fresh); // keep the local draft in sync with what actually saved
 
-      // use the actual returned/updated logo, not an undefined variable
-      window.dispatchEvent(
-        new CustomEvent("system-details-updated", {
-          detail: updated ?? "",
-        }),
-      );
-
-      showModal("System settings updated successfully.", { type: "success", 
-        title: "Success", autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal("System settings updated successfully.", {
+        type: "success",
+        title: "Success",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } catch (err) {
-      showModal(err.message || "Could not update system settings.", { type: "error", title: "Error", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal(err.message || "Could not update system settings.", {
+        type: "error",
+        title: "Error",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } finally {
       setSavingSystem(false);
     }
@@ -506,16 +499,22 @@ export default function Settings() {
       await api.del(`/api/system/logo/${system.id}`, formData, {
         isForm: true,
       });
-
-    const updated =  await loadSystemDetails();
-      window.dispatchEvent(
-        new CustomEvent("system-details-updated", { detail: updated ?? "" }),
-      );
-      showModal("System logo removed.", { type: "info", title: "Info", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      const fresh = await systemCtx.refresh(); // re-fetches once, updates context everywhere
+      showModal("System logo removed.", {
+        type: "info",
+        title: "Info",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } catch (err) {
-      showModal(err.message || "Could not remove system logo.", { type: "error", title: "Error", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal(err.message || "Could not remove system logo.", {
+        type: "error",
+        title: "Error",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } finally {
       setSavingSystem(false);
     }
@@ -554,11 +553,21 @@ export default function Settings() {
       setProfileUser(data.admin);
       clearSelectedPhoto();
       setEditingField(null);
-      showModal("Profile updated successfully.", { type: "success", title: "Success", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal("Profile updated successfully.", {
+        type: "success",
+        title: "Success",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } catch (error) {
-      showModal(error.message || "Could not update profile.", { type: "error", title: "Error", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal(error.message || "Could not update profile.", {
+        type: "error",
+        title: "Error",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -572,11 +581,21 @@ export default function Settings() {
       const data = await api.del(`/api/auth/admins/${user.id}/photo`);
       updateCurrentUser(data.admin);
       setProfileUser(data.admin);
-      showModal("Profile photo removed.", { type: "info", title: "Info", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal("Profile photo removed.", {
+        type: "info",
+        title: "Info",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } catch (error) {
-      showModal(error.message || "Could not remove profile photo.", { type: "error", title: "Error", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false }); 
+      showModal(error.message || "Could not remove profile photo.", {
+        type: "error",
+        title: "Error",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } finally {
       setIsRemovingPhoto(false);
     }
@@ -584,20 +603,34 @@ export default function Settings() {
 
   // ── Change password ─────────────────────────────────────────────────────
   const changePassword = async () => {
-    
     if (!pwd.current) {
-      showModal("Current password is required.", { type: "warning", title: "Warning", autoClose: true, 
-        autoCloseDelay: 2000, confirmText: false });
+      showModal("Current password is required.", {
+        type: "warning",
+        title: "Warning",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
       return;
     }
     if (pwd.next.length < 6) {
-      showModal("New password must be at least 6 characters", { type: "warning", title: "Warning", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal("New password must be at least 6 characters", {
+        type: "warning",
+        title: "Warning",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
       return;
     }
     if (pwd.next !== pwd.confirm) {
-      showModal("New passwords do not match", { type: "warning", title: "Warning", autoClose: true, 
-        autoCloseDelay: 2000, confirmText: false });
+      showModal("New passwords do not match", {
+        type: "warning",
+        title: "Warning",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
       return;
     }
     try {
@@ -610,11 +643,21 @@ export default function Settings() {
 
       setSaving(false);
       setPwd({ current: "", next: "", confirm: "" });
-      showModal("Password changed successfully.", { type: "success", title: "Success", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal("Password changed successfully.", {
+        type: "success",
+        title: "Success",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } catch (e) {
-      showModal(e.message ?? "Failed to change password", { type: "error", title: "Error", 
-        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal(e.message ?? "Failed to change password", {
+        type: "error",
+        title: "Error",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      });
     } finally {
       setSaving(false);
     }
@@ -626,12 +669,12 @@ export default function Settings() {
   // Profile tab — pulled from the same `system` state that the System
   // Settings tab edits, so the two stay in sync.
   const systemInfoRows = [
-    ["System Name", system.system_name || "—"],
-    ["Other Name", system.other_name || "—"],
-    ["Support Email", system.system_email || "—"],
-    ["Last Updated", formatDate(system.updated_at)],
+    ["System Name", systemCtx.system_name || "—"],
+    ["Other Name", systemCtx.other_name || "—"],
+    ["Support Email", systemCtx.system_email || "—"],
+    ["Last Updated", formatDate(systemCtx.updated_at)],
     ["Database Size", `${dbSize} MB`],
-    ["Maintenance Mode", system.maintenance_mode ? "On" : "Off"],
+    ["Maintenance Mode", systemCtx.maintenance_mode ? "On" : "Off"],
   ];
 
   return (
@@ -807,9 +850,9 @@ export default function Settings() {
             <div className="col-lg-6">
               <div className="card-surface p-4">
                 <div className="d-flex align-items-center gap-3 mb-3">
-                  {system.system_logo && (
+                  {systemCtx.system_logo && (
                     <img
-                      src={system.system_logo}
+                      src={systemCtx.system_logo}
                       alt=""
                       className="rounded border"
                       style={{ width: 36, height: 36, objectFit: "cover" }}
@@ -948,85 +991,89 @@ export default function Settings() {
             </div>
           </div>
         )}
-
-        {tab === "System Settings" && (
-          <div className="card-surface p-4">
-            <p className="fw-semibold mb-3">System Settings</p>
-
-            <SystemLogoUploader
-              logoUrl={system.system_logo}
-              preview={systemLogoPreview}
-              onChoose={chooseSystemLogo}
-              onDeleteExisting={deleteExistingSystemLogo}
-              onDiscardPreview={discardSystemLogoPreview}
-              inputRef={logoInputRef}
-            />
-
-            <div className="row g-3">
-              <EditableSystemField
-                field="system_name"
-                label="System Name"
-                value={system.system_name}
-                editingField={editingSystemField}
-                setEditingField={setEditingSystemField}
-                onChange={updateSystemField}
-              />
-              <EditableSystemField
-                field="other_name"
-                label="Other Name"
-                value={system.other_name}
-                editingField={editingSystemField}
-                setEditingField={setEditingSystemField}
-                onChange={updateSystemField}
-              />
-              <EditableSystemField
-                field="system_email"
-                label="Support Email"
-                type="email"
-                value={system.system_email}
-                editingField={editingSystemField}
-                setEditingField={setEditingSystemField}
-                onChange={updateSystemField}
-              />
-
-              <EditableSystemTextarea
-                field="description"
-                label="Description"
-                value={system.description}
-                editingField={editingSystemField}
-                setEditingField={setEditingSystemField}
-                onChange={updateSystemField}
-              />
+        {tab === "System Settings" &&
+          (!system ? (
+            <div className="card-surface p-4">
+              <LoadingSpinner fullScreen label="Loading..." />
             </div>
+          ) : (
+            <div className="card-surface p-4">
+              <p className="fw-semibold mb-3">System Settings</p>
 
-            <div className="row g-3 mt-1">
-              <div className="col-md-4 col-sm-6">
-                <div className="form-check form-switch">
-                  <input
-                    className="form-check-input"
-                    type="checkbox"
-                    role="switch"
-                    id="maintenance"
-                    checked={system.maintenance_mode}
-                    onChange={(e) =>
-                      updateSystemField("maintenance_mode", e.target.checked)
-                    }
-                  />
-                  <label className="form-check-label" htmlFor="maintenance">
-                    Maintenance Mode
-                  </label>
+              <SystemLogoUploader
+                logoUrl={systemCtx.system_logo}
+                preview={systemLogoPreview}
+                onChoose={chooseSystemLogo}
+                onDeleteExisting={deleteExistingSystemLogo}
+                onDiscardPreview={discardSystemLogoPreview}
+                inputRef={logoInputRef}
+              />
+
+              <div className="row g-3">
+                <EditableSystemField
+                  field="system_name"
+                  label="System Name"
+                  value={system.system_name}
+                  editingField={editingSystemField}
+                  setEditingField={setEditingSystemField}
+                  onChange={updateSystemField}
+                />
+                <EditableSystemField
+                  field="other_name"
+                  label="Other Name"
+                  value={system.other_name}
+                  editingField={editingSystemField}
+                  setEditingField={setEditingSystemField}
+                  onChange={updateSystemField}
+                />
+                <EditableSystemField
+                  field="system_email"
+                  label="Support Email"
+                  type="email"
+                  value={system.system_email}
+                  editingField={editingSystemField}
+                  setEditingField={setEditingSystemField}
+                  onChange={updateSystemField}
+                />
+
+                <EditableSystemTextarea
+                  field="description"
+                  label="Description"
+                  value={system.description}
+                  editingField={editingSystemField}
+                  setEditingField={setEditingSystemField}
+                  onChange={updateSystemField}
+                />
+              </div>
+
+              <div className="row g-3 mt-1">
+                <div className="col-md-4 col-sm-6">
+                  <div className="form-check form-switch">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      role="switch"
+                      id="maintenance"
+                      checked={system.maintenance_mode}
+                      onChange={(e) =>
+                        updateSystemField("maintenance_mode", e.target.checked)
+                      }
+                    />
+                    <label className="form-check-label" htmlFor="maintenance">
+                      Maintenance Mode
+                    </label>
+                  </div>
                 </div>
               </div>
+              <button
+                className="btn btn-brand rounded-3 mt-4 px-4"
+                onClick={saveSystemDetails}
+                disabled={savingSystem}
+              >
+                {savingSystem ? "Saving..." : "Save Settings"}
+              </button>
             </div>
-            <button
-              className="btn btn-brand rounded-3 mt-4 px-4"
-              onClick={saveSystemDetails}
-              disabled={savingSystem}
-            >
-              {savingSystem ? "Saving..." : "Save Settings"}
-            </button>
-          </div>
-        )}
+          ))}
       </div>
     </>
   );

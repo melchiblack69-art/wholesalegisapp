@@ -2,41 +2,29 @@ import React from "react";
 import { useEffect, useState } from "react";
 import { api } from "../api/client"; // named import
 import logo from "../assets/logo.png"; // default import
+import { useSystemSettings } from "../context/SystemSettingsContext";
 
 export default function MaintenancePage() {
-  const [systemDetail, setSystemDetail] = useState({});
-  useEffect(() => {
-  const getSystemDetail = async () => {
-    try {
-      const detail = await api.get("/api/system/sys-details");
-      setSystemDetail(detail);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-  getSystemDetail();
-  const interval = setInterval(getSystemDetail, 15000); // refresh every 15s
-  return () => clearInterval(interval);
-}, []);
+const systemCtx = useSystemSettings();
   return (
     <div className="sysmaint-page">
       <header className="sysmaint-header">
         <div className="sysmaint-logo">
           <img
-            src={systemDetail?.system_logo || logo}
+            src={systemCtx?.system_logo || logo}
             alt="North Industrial Area Wholesale Locator"
             className="sysmaint-logo"
           />
         </div>
         <div className="d-flex flex-column lh-1">
           <span className="fw-bold" style={{ fontSize: "1.1rem" }}>
-            {systemDetail?.system_name || "NORTH INDUSTRIAL AREA "}
+            {systemCtx?.system_name || "NORTH INDUSTRIAL AREA "}
           </span>
           <span
             className="fw-semibold"
             style={{ fontSize: "0.85rem", color: "var(--color-primary)" }}
           >
-            {systemDetail?.other_name || "Wholesale Locator"}
+            {systemCtx?.other_name || "Wholesale Locator"}
           </span>
         </div>
       </header>

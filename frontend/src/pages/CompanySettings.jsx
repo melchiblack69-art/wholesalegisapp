@@ -4,7 +4,7 @@ import Topbar from "../components/Topbar";
 import { useAuth } from "../context/AuthContext";
 import { useSidebar } from "../context/SidebarContext";
 import { useModal } from "../context/ModalContext";
-
+import { useSystemSettings } from "../context/SystemSettingsContext";
 const tabs = ["Profile", "Change Password"];
 // Renders a date string as "July 31, 2026". Falls back to "—" if the
 // value is missing or isn't a parseable date.
@@ -107,21 +107,14 @@ export default function CompanySettings() {
   const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState(false);
   const[saving, setSaving] = useState(false);
+  const [system, setSystem] = useState(); 
   const [showPwd, setShowPwd] = useState({
     current: false,
     next: false,
     confirm: false,
   });
-  const [system, setSystem] = useState({
-    id: "",
-    system_name: "",
-    other_name: "",
-    system_version: "",
-    system_email: "",
-    maintenance_mode: false,
-    updated_at: "",
-
-  });
+  const systemCtx = useSystemSettings();
+  
 
 const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
   const handlePwd = (f) => (e) =>
@@ -237,7 +230,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
        showModal("Profile updated successfully.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } catch (error) {
-      setMessage(error.message); showModal("Something went wrong.", { type: "error", title: "Error", 
+       showModal("Something went wrong.", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } finally {
       setIsSaving(false);
@@ -255,7 +248,6 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
        showModal("Profile photo removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } catch (error) {
-      setMessage(error.message);
        showModal("Something went wrong.", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } finally {
@@ -263,26 +255,6 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
     }
   };
 
-   const loadSystemDetails = async () => {
-    try {
-      const data = await api.get("/api/system/system-details");
-
-      setSystem({
-        id: data.id,
-        system_logo: data.system_logo || "",
-        system_name: data.system_name || "",
-        system_version: data.system_version || "1.0.0",
-        other_name: data.other_name || "",
-        system_email: data.system_email || "",
-        maintenance_mode: !!data.maintenance_mode,
-        updated_at: data.updated_at || "",
-      });
-    } catch (err) {
-      console.log(err);
-    }
-  };
-
-  
 const getDbSize = async() =>{
 try{
 const size = await api.get("/api/system/database-size");
@@ -291,24 +263,34 @@ setDbSize(size.size_mb);
 console.error(e)
 }
 };
-  // FETCH SYSTEM DETAILS — used by both the Profile info card and the
-  // System Settings tab, so it's loaded once here.
-  useEffect(() => {
-    loadSystemDetails();
-    getDbSize();
-  }, []);
 
+    useEffect(() => {
+       getDbSize ();
+     if (!systemCtx?.loaded) return;
+     setSystem({
+       id: systemCtx.id,
+       system_name: systemCtx.system_name,
+       other_name: systemCtx.other_name,
+       system_logo: systemCtx.system_logo,
+       system_email: systemCtx.system_email,
+       maintenance_mode: systemCtx.maintenance_mode,
+       description: systemCtx.description,
+       updated_at: systemCtx.updated_at,
+     });
+     
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [systemCtx?.loaded,systemCtx?.updated_at]);
+  
   const displayedPhoto = photoPreview || profileUser?.photo;
 
-  const systemInfoRows = [
-    ["System Name", system.system_name || "—"],
-    ["Other Name", system.other_name || "—"],
-    ["Version", system.syste_version || "1.0.0"],
-    ["Support Email", system.system_email || "—"],
-    ["Last Updated", formatDate(system.updated_at)],
-    ["Database Size", `${dbSize} MB`],
-    ["Maintenance Mode", system.maintenance_mode ? "On" : "Off"],
-  ];
+ const systemInfoRows = [
+  ["System Name", systemCtx.system_name || "—"],
+  ["Other Name", systemCtx.other_name || "—"],
+  ["Support Email", systemCtx.system_email || "—"],
+  ["Last Updated", formatDate(systemCtx.updated_at)],
+  ["Database Size", `${dbSize} MB`],
+  ["Maintenance Mode", systemCtx.maintenance_mode ? "On" : "Off"],
+];
 
   return (
     <>
@@ -379,9 +361,9 @@ console.error(e)
              <div className="col-lg-6">
               <div className="card-surface p-4">
                 <div className="d-flex align-items-center gap-3 mb-3">
-                  {system.system_logo && (
+                  {systemCtx.system_logo && (
                     <img
-                      src={system.system_logo}
+                      src={systemCtx.system_logo}
                       alt=""
                       className="rounded border"
                       style={{ width: 36, height: 36, objectFit: "cover" }}

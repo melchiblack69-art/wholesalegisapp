@@ -16,74 +16,75 @@ export function setToken(token) {
 }
 
 async function request(path, { method = "GET", body, isForm = false } = {}) {
-  const headers = {};
-
-  const token = getToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  if (!isForm && body) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    ...(method === "GET" || method === "HEAD"
-      ? {}
-      : {
-          body: body
-            ? isForm
-              ? body
-              : JSON.stringify(body)
-            : undefined,
-        }),
-  });
-
-  let data = null;
   showGlobalLoading();
   try {
-    data = await res.json();
-  } catch {
-    // No JSON response (e.g. empty body, 204, or HTML error page)
-  }finally{
-  hideGlobalLoading();
-  }
+    const headers = {};
 
-  if (!res.ok) {
-    // Maintenance Mode
-    if (res.status === 503 && data?.maintenance) {
-      if (window.location.pathname !== "/maintenance") {
-        console.log("Maintenance Mode: redirecting from", window.location.pathname);
-        window.location.href = "/maintenance";
-      }
-      const err = new Error(data?.message || "The system is under maintenance.");
-      err.isMaintenance = true;
-      throw err;
+    const token = getToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    // Unauthorized
-    if (res.status === 401) {
-      const isSessionIssue = ["Invalid token", "Not authorized", "Token expired"].includes(
-        data?.message
-      );
+    if (!isForm && body) {
+      headers["Content-Type"] = "application/json";
+    }
 
-      // Only redirect for real session/auth failures, not for ordinary permission errors.
-      if (path !== "/api/auth/login" && isSessionIssue) {
-        localStorage.removeItem(TOKEN_KEY);
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      ...(method === "GET" || method === "HEAD"
+        ? {}
+        : {
+            body: body
+              ? isForm
+                ? body
+                : JSON.stringify(body)
+              : undefined,
+          }),
+    });
+
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      // No JSON response (e.g. empty body, 204, or HTML error page)
+    }
+
+    if (!res.ok) {
+      // Maintenance Mode
+      if (res.status === 503 && data?.maintenance) {
+        if (window.location.pathname !== "/maintenance") {
+          console.log("Maintenance Mode: redirecting from", window.location.pathname);
+          window.location.href = "/maintenance";
         }
+        const err = new Error(data?.message || "The system is under maintenance.");
+        err.isMaintenance = true;
+        throw err;
       }
-      throw new Error(data?.message || "Unauthorized");
+
+      // Unauthorized
+      if (res.status === 401) {
+        const isSessionIssue = ["Invalid token", "Not authorized", "Token expired"].includes(
+          data?.message
+        );
+
+        if (path !== "/api/auth/login" && isSessionIssue) {
+          localStorage.removeItem(TOKEN_KEY);
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+        }
+        throw new Error(data?.message || "Unauthorized");
+      }
+
+      // Catch-all: 400, 403, 404, 409, 500, etc.
+      throw new Error(data?.message || `Request failed (${res.status})`);
     }
 
-    // Catch-all: 400, 403, 404, 409, 500, etc.
-    throw new Error(data?.message || `Request failed (${res.status})`);
+    return data;
+  } finally {
+    hideGlobalLoading();
   }
-
-  return data;
 }
 
 export const api = {

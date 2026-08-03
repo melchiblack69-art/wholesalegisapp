@@ -11,15 +11,18 @@ import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { ModalProvider } from "./context/ModalContext.jsx";
 import { GlobalLoader } from "./context/GlobalLoaderContext.jsx";
+import { SystemSettingsProvider } from "./context/SystemSettingsContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
+        <SystemSettingsProvider>
         <ModalProvider>
-          <GlobalLoader />
           <App />
+          <GlobalLoader />
         </ModalProvider>
+        </SystemSettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>
