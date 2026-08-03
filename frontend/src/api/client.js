@@ -51,15 +51,19 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
     // Maintenance Mode
     if (res.status === 503 && data?.maintenance) {
       if (window.location.pathname !== "/maintenance") {
-        console.log( "Maintenace Mode: ", window.location.pathname);
+        console.log("Maintenance Mode: redirecting from", window.location.pathname);
         window.location.href = "/maintenance";
       }
-      throw new Error(data?.message || "The system is under maintenance.");
+      const err = new Error(data?.message || "The system is under maintenance.");
+      err.isMaintenance = true;
+      throw err;
     }
 
     // Unauthorized
     if (res.status === 401) {
-      const isSessionIssue = ["Invalid token", "Not authorized", "Token expired"].includes(data?.message);
+      const isSessionIssue = ["Invalid token", "Not authorized", "Token expired"].includes(
+        data?.message
+      );
 
       // Only redirect for real session/auth failures, not for ordinary permission errors.
       if (path !== "/api/auth/login" && isSessionIssue) {
@@ -83,7 +87,7 @@ export const api = {
   post: (path, body, opts = {}) => request(path, { method: "POST", body, ...opts }),
   put: (path, body, opts = {}) => request(path, { method: "PUT", body, ...opts }),
   patch: (path, body, opts = {}) => request(path, { method: "PATCH", body, ...opts }),
-  del: (path) => request(path, { method: "DELETE" }),
+  del: (path, body, opts = {}) => request(path, { method: "DELETE", body, ...opts }),
 };
 
 /*

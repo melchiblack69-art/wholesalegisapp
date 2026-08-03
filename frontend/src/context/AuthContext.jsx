@@ -43,9 +43,24 @@ export function AuthProvider({ children }) {
         const currentUser = normalizeUser(data);
         if (!currentUser) throw new Error("Invalid session response");
         setUser(currentUser);
+        setLoading(false);
       })
-      .catch(() => setToken(null))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        // Maintenance mode: client.js has already kicked off a hard
+        // window.location.href navigation to /maintenance. Don't clear the
+        // token or flip loading to false here — doing so would let
+        // ProtectedRoute re-render with user=null and race in its own
+        // client-side redirect to /login before the real navigation
+        // finishes, which is what was causing the login/index.html bounce.
+        if (err?.isMaintenance) {
+          return;
+        }
+
+        // Any other failure (expired/invalid token, network error, etc.)
+        // really does mean the session is bad — clear it normally.
+        setToken(null);
+        setLoading(false);
+      });
   }, []);
 
   const login = async ({ email, password }) => {
@@ -72,7 +87,16 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateCurrentUser, isSuperAdmin: user?.role === "super_admin" }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        updateCurrentUser,
+        isSuperAdmin: user?.role === "super_admin",
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
