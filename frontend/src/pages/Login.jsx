@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.png";
+import { api } from "../api/client";
 
 export default function Login() {
   const { login } = useAuth();
@@ -11,7 +12,21 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showPw, setShowPw] = useState(false);
-
+    const [systemDetail, setSystemDetail] = useState({});
+     useEffect(() => {
+     const getSystemDetail = async () => {
+       try {
+         const detail = await api.get("/api/system/sys-details");
+         setSystemDetail(detail);
+       } catch (e) {
+         console.error(e);
+       }
+     };
+     getSystemDetail();
+     const interval = setInterval(getSystemDetail, 15000); // refresh every 15s
+     return () => clearInterval(interval);
+   }, []);
+   
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const onSubmit = async (e) => {
@@ -34,11 +49,11 @@ export default function Login() {
       <div className="auth-card">
         <div className="d-flex align-items-center gap-2 mb-4">
           <span className="icon-circle bg-primary-brand text-white" style={{ width: 44, height: 44 }}>
-            <img src={logo} alt="North Industrial Area Wholesale Locator" className="sidebar-logo" />
+            <img src={ systemDetail?.system_logo|| logo} alt="North Industrial Area Wholesale Locator" className="sidebar-logo" />
           </span>
           <div className="d-flex flex-column lh-1">
-            <span className="fw-bold" style={{ fontSize: "0.95rem" }}>NORTH INDUSTRIAL AREA</span>
-            <span className="text-muted-brand" style={{ fontSize: "0.72rem" }}>Wholesale Locator · Admin</span>
+            <span className="fw-bold" style={{ fontSize: "0.95rem" }}>{systemDetail?.system_name || "NORTH INDUSTRIAL AREA"}</span>
+            <span className="text-muted-brand" style={{ fontSize: "0.72rem" }}>{systemDetail?.other_name || "Wholesale Locator"} . Admin Panel</span>
           </div>
         </div>
 

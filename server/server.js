@@ -18,10 +18,9 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:3000",
-    "http://localhost:5173",
+    "https://dashboard-41ru.onrender.com",
     "http://localhost:3001",
-    "http://192.168.43.99:3000",
-    "http://192.168.43.99:3001",
+    "https://admin-portal-c3a6.onrender.com",
     /\.ngrok-free\.app$/,
     /\.trycloudflare\.com$/,
   ],

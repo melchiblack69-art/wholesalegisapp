@@ -1,6 +1,7 @@
 // Central place that talks to your Express API.
 // Set VITE_API_URL in a .env file, e.g. VITE_API_URL=https://your-api.onrender.com/api
 export const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
+console.log("API base URL:", BASE_URL);
 
 const TOKEN_KEY = "admin_token";
 
