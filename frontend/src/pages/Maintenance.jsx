@@ -15,8 +15,7 @@ export default function MaintenancePage() {
     }
   };
   getSystemDetail();
-  const interval = setInterval(getSystemDetail, 15000); // refresh every 15s
-  return () => clearInterval(interval);
+ 
 }, []);
   return (
     <div className="sysmaint-page">
