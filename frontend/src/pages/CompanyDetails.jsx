@@ -4,7 +4,6 @@ import Topbar from "../components/Topbar";
 import AdminMap, { NIA_CENTER } from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { categories, getCategory, getCategoryValue } from "../data/categories";
 import { api } from "../api/client";
 import { useModal } from "../context/ModalContext";
 
@@ -82,6 +81,7 @@ export default function CompanyDetails() {
   const companyId = id || (location.pathname === "/my-company" ? user?.companyId : null);
   const fileInputRef = useRef(null);
   const [companyDetails, setCompanyDetails] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [loadingCompany, setLoadingCompany] = useState(Boolean(id));
   const {showModal} = useModal();
 
@@ -112,6 +112,10 @@ export default function CompanyDetails() {
   const [workingHours, setWorkingHours] = useState([{ days: "", openTime: "", closeTime: "" }]);
 
   useEffect(() => {
+    api.get("/api/company/categories").then((rows) => setCategories(Array.isArray(rows) ? rows : [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!companyId || !user) return;
 
     if (!isOwnCompany) {
@@ -136,7 +140,7 @@ export default function CompanyDetails() {
         setCompanyDetails(company || null);
         setForm({
           name: company?.company_name || company?.name || "",
-          category: getCategoryValue(company?.cat_id || company?.category || company?.category_name),
+          category: String(company?.cat_id || company?.category_id || company?.category || ""),
           phone: company?.phone || "",
           email: company?.email || "",
           address: company?.address || "",
@@ -258,14 +262,14 @@ export default function CompanyDetails() {
       try {
         await api.del(`/api/company/${companyId}/images/${image.id}`);
       } catch (error) {
-        setMessage(error.message || "Could not delete image.");showModal(error.message || "Could not delete image(s).", { type: "error", title: "Error", 
+        showModal(error.message || "Could not delete image(s).", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
         return;
       }
     }
 
     setImages((prev) => prev.filter((item) => item.key !== image.key && item.id !== image.id));
-    showModal("Image removed.", { type: "warning", title: "Message", 
+    showModal("Image removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
   };
 
@@ -275,7 +279,7 @@ export default function CompanyDetails() {
     try {
       await Promise.all(images.filter((image) => image.id).map((image) => api.del(`/api/company/${companyId}/images/${image.id}`)));
       setImages([]);
-      showModal("All images removed.", { type: "success", title: "Message", 
+      showModal("All images removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } catch (error) {
       showModal(error.message || "Could not delete all images.", { type: "error", title: "Error", 
@@ -315,6 +319,7 @@ export default function CompanyDetails() {
     try {
       await api.put(`/api/company/companies/${companyId}`, {
         company_name: form.name,
+        category_id: form.category ? Number(form.category) : null,
         phone: form.phone,
         email: form.email,
         address: form.address,
@@ -370,7 +375,7 @@ export default function CompanyDetails() {
                       <select required className="form-select" value={form.category} onChange={update("category")} disabled={!editableFields.category}>
                         <option value="">Select category</option>
                         {categories.map((c) => (
-                          <option key={c.slug} value={c.slug}>{c.name}</option>
+                          <option key={c.id} value={c.id}>{c.category_name || c.name}</option>
                         ))}
                       </select>
                       <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => toggleFieldEdit("category")} title="Edit field">
@@ -378,7 +383,7 @@ export default function CompanyDetails() {
                       </button>
                     </div>
                     {companyDetails?.cat_id && !form.category && (
-                      <small className="text-muted-brand">Current category: {getCategory(companyDetails.cat_id)?.name || companyDetails.category_name}</small>
+                      <small className="text-muted-brand">Current category: {companyDetails.category_name}</small>
                     )}
                   </div>
                   <div className="col-sm-6">

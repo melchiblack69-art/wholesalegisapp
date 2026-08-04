@@ -6,7 +6,6 @@ import Pagination from "../components/Pagination";
 import TableToolbar from "../components/TableToolbar";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
-import { categories as seedCategories } from "../data/categories";
 
 const PAGE_SIZE = 8;
 
@@ -18,6 +17,7 @@ export default function Companies() {
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [localCompanies, setLocalCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -29,12 +29,12 @@ export default function Companies() {
         const rows = await api.get("/api/auth/companies");
         const normalized = Array.isArray(rows)
           ? rows.map((company) => {
-              const seed = seedCategories.find((item) => item.name === company.category_name || item.slug === company.category_name || String(item.id) === String(company.cat_id));
-              const categorySlug = seed?.slug || (company.category_name || "others").toLowerCase().replace(/\s+/g, "-");
               return {
                 id: company.id,
                 name: company.company_name || company.name,
-                category: categorySlug,
+                category: String(company.category_id || company.cat_id || ""),
+                category_name: company.category_name || "Uncategorized",
+                category_color: company.category_color || company.color || "#1c6b41",
                 phone: company.phone || "",
                 lat: Number(company.latitude || 0),
                 lng: Number(company.longitude || 0),
@@ -47,6 +47,13 @@ export default function Companies() {
               };
             })
           : [];
+        const categoryMap = new Map();
+        (Array.isArray(rows) ? rows : []).forEach((company) => {
+          const id = company.category_id || company.cat_id;
+          const name = company.category_name;
+          if (id && name && !categoryMap.has(String(id))) categoryMap.set(String(id), { id, category_name: name, color: company.category_color || company.color });
+        });
+        setCategories(Array.from(categoryMap.values()));
         setLocalCompanies(normalized);
       } catch (error) {
         setMessage(error.message || "Could not load companies.");
@@ -97,8 +104,8 @@ export default function Companies() {
               <>
                 <select className="form-select" style={{ width: 160 }} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
                   <option value="all">All Categories</option>
-                  {seedCategories.map((c) => (
-                    <option key={c.slug} value={c.slug}>{c.name}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.category_name || c.name}</option>
                   ))}
                 </select>
                 <select className="form-select" style={{ width: 140 }} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
@@ -138,12 +145,12 @@ export default function Companies() {
                   </tr>
                 )}
                 {pageRows.map((c, i) => {
-                  const cat = seedCategories.find((cc) => cc.slug === c.category);
+                  const cat = categories.find((cc) => String(cc.id) === String(c.category));
                   return (
                     <tr key={c.id}>
                       <td className="text-muted-brand">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
                       <td className="fw-medium">{c.name}</td>
-                      <td style={{ color: cat?.color }}>{cat?.name}</td>
+                      <td style={{ color: c.category_color || cat?.color }}>{c.category_name || cat?.category_name || cat?.name || "Uncategorized"}</td>
                       <td className="text-muted-brand">{c.phone}</td>
                       <td className="text-muted-brand">{c.total_products}</td>
                       <td><StatusBadge status={c.status} /></td>

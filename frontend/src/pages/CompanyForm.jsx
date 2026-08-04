@@ -4,7 +4,6 @@ import Topbar from "../components/Topbar";
 import AdminMap, { NIA_CENTER } from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
-import { categories, getCategory, getCategoryValue } from "../data/categories";
 import { api } from "../api/client";
 import { useModal } from "../context/ModalContext";
 
@@ -27,6 +26,7 @@ export default function CompanyForm() {
   const companyId = id || (location.pathname === "/my-company" ? user?.companyId : null);
   const fileInputRef = useRef(null);
   const [companyDetails, setCompanyDetails] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [loadingCompany, setLoadingCompany] = useState(Boolean(id));
 
   // A "company" account may only ever edit its own linked company record.
@@ -53,6 +53,20 @@ export default function CompanyForm() {
   const [editableFields, setEditableFields] = useState({});
 
   useEffect(() => {
+    api.get("/api/auth/companies")
+      .then((rows) => {
+        const categoryMap = new Map();
+        (Array.isArray(rows) ? rows : []).forEach((company) => {
+          const id = company.category_id || company.cat_id;
+          const name = company.category_name;
+          if (id && name && !categoryMap.has(String(id))) categoryMap.set(String(id), { id, category_name: name });
+        });
+        setCategories(Array.from(categoryMap.values()));
+      })
+      .catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
     if (!companyId || !user) return;
 
     if (!isOwnCompany) {
@@ -77,7 +91,7 @@ export default function CompanyForm() {
         setCompanyDetails(company || null);
         setForm({
           name: company?.company_name || company?.name || "",
-          category: getCategoryValue(company?.cat_id || company?.category || company?.category_name),
+          category: String(company?.cat_id || company?.category_id || company?.category || ""),
           phone: company?.phone || "",
           email: company?.email || "",
           address: company?.address || "",
@@ -231,16 +245,32 @@ export default function CompanyForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    // Wire this to your real API — payload is already shaped and ready:
-    // const body = new FormData();
-    // Object.entries(form).forEach(([k, v]) => body.append(k, v));
-    // if (pin) { body.append("lat", pin[0]); body.append("lng", pin[1]); }
-    // images.filter((i) => i.file).forEach((i) => body.append("images", i.file));
-    // await api.post(`/companies${isEdit ? "/" + id : ""}`, body, { isForm: true });
-    setSaved(true);
-    setTimeout(() => navigate(COMPANY_MANAGEMENT_ROLES.includes(user?.role) ? "/my-company" : "/companies"), 900);
+    try {
+      const payload = {
+        company_name: form.name,
+        category_id: form.category ? Number(form.category) : null,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+        latitude: pin ? pin[0] : null,
+        longitude: pin ? pin[1] : null,
+        description: form.description,
+        status: companyDetails?.status || "Active",
+      };
+
+      if (isEdit) {
+        await api.put(`/api/company/companies/${companyId}`, payload);
+      } else {
+        await api.post("/api/company/companies", payload);
+      }
+
+      setSaved(true);
+      setTimeout(() => navigate(COMPANY_MANAGEMENT_ROLES.includes(user?.role) ? "/my-company" : "/companies"), 900);
+    } catch (error) {
+      showModal(error.message || "Could not save company.", { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2500, confirmText: false });
+    }
   };
 
   const productList = Array.isArray(companyDetails?.products) && companyDetails.products.length
@@ -281,7 +311,7 @@ export default function CompanyForm() {
                       <select required className="form-select" value={form.category} onChange={update("category")} disabled={!canEditField("category")}>
                         <option value="">Select category</option>
                         {categories.map((c) => (
-                          <option key={c.slug} value={c.slug}>{c.name}</option>
+                          <option key={c.id} value={c.id}>{c.category_name || c.name}</option>
                         ))}
                       </select>
                       {!isCreateMode && (
@@ -291,7 +321,7 @@ export default function CompanyForm() {
                       )}
                     </div>
                     {companyDetails?.cat_id && !form.category && (
-                      <small className="text-muted-brand">Current category: {getCategory(companyDetails.cat_id)?.name || companyDetails.category_name}</small>
+                      <small className="text-muted-brand">Current category: {companyDetails.category_name}</small>
                     )}
                   </div>
                   <div className="col-sm-6">

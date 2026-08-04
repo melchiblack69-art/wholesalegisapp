@@ -1,34 +1,12 @@
 const db           = require("../config/db");
 
-const categoryPalette = {
-  "building materials": { color: "#2f6fed", bg: "#e9f0ff", icon: "bi-house-door-fill" },
-  electricals: { color: "#2fa84f", bg: "#e9f9ee", icon: "bi-lightning-charge-fill" },
-  "food & beverages": { color: "#e8792e", bg: "#fdece0", icon: "bi-bag-fill" },
-  machinery: { color: "#2f8fed", bg: "#e9f3ff", icon: "bi-gear-fill" },
-  "general goods": { color: "#2f9e6e", bg: "#e7f7ef", icon: "bi-box-seam-fill" },
-  others: { color: "#7a5cd6", bg: "#f0ecfd", icon: "bi-grid-fill" },
-};
-
-function getCategoryStyle(name, fallbackIcon) {
-  const normalized = String(name || "").trim().toLowerCase();
-  const direct = categoryPalette[normalized];
-  if (direct) return { ...direct, icon: fallbackIcon || direct.icon };
-
-  for (const [key, value] of Object.entries(categoryPalette)) {
-    if (normalized.includes(key) || key.includes(normalized)) {
-      return { ...value, icon: fallbackIcon || value.icon };
-    }
-  }
-
-  return { color: "#7a5cd6", bg: "#f0ecfd", icon: fallbackIcon || "bi-grid-fill" };
-}
-
 //========== CATEGORY MANAGEMENT ENDPOINTS (add, update, delete) ============================
 //add a new category
 exports.addCategory = async (req, res) => {
   try {
     const categoryName = req.body.category_name ?? req.body.name;
     const categoryIcon = req.body.category_icon ?? req.body.icon;
+    const categoryColor = req.body.category_color ?? req.body.color ?? "#1c6b41";
 
     if (!categoryName) {
       return res.status(400).json({ message: "Category name is required" });
@@ -44,14 +22,14 @@ exports.addCategory = async (req, res) => {
     }
 
     const [result] = await db.query(
-      "INSERT INTO categories (category_name, icon) VALUES (?, ?)",
-      [categoryName, categoryIcon]
+      "INSERT INTO categories (category_name, icon, color) VALUES (?, ?, ?)",
+      [categoryName, categoryIcon, categoryColor]
     );
 
     res.status(201).json({
       message: "Category added successfully",
       id: result.insertId,
-      category: { id: result.insertId, category_name: categoryName, icon: categoryIcon }
+      category: { id: result.insertId, category_name: categoryName, icon: categoryIcon, color: categoryColor }
     });
   } catch (err) {
     console.error(err);
@@ -65,10 +43,11 @@ exports.updateCategory = async (req, res) => {
     const { id } = req.params;
     const categoryName = req.body.category_name ?? req.body.name;
     const categoryIcon = req.body.category_icon ?? req.body.icon;
+    const categoryColor = req.body.category_color ?? req.body.color ?? "#1c6b41";
 
     const [result] = await db.query(
-      "UPDATE categories SET category_name=?, icon=? WHERE id=?",
-      [categoryName, categoryIcon, id]
+      "UPDATE categories SET category_name=?, icon=?, color=? WHERE id=?",
+      [categoryName, categoryIcon, categoryColor, id]
     );
 
     if (!result.affectedRows) {
@@ -77,7 +56,7 @@ exports.updateCategory = async (req, res) => {
 
     res.json({
       message: "Category updated successfully",
-      category: { id, category_name: categoryName, icon: categoryIcon }
+      category: { id, category_name: categoryName, icon: categoryIcon, color: categoryColor }
     });
   } catch (err) {
     console.error(err);
@@ -114,6 +93,7 @@ exports.getCategories = async (req, res) => {
         c.id,
         c.category_name,
         c.icon,
+        c.color,
         COUNT(co.id) AS company_count
       FROM categories c
       LEFT JOIN companies co ON co.category_id = c.id
@@ -122,13 +102,12 @@ exports.getCategories = async (req, res) => {
     `);
 
     const categories = rows.map((row) => {
-      const style = getCategoryStyle(row.category_name, row.icon);
       return {
         id: row.id,
         category_name: row.category_name,
-        icon: style.icon,
-        color: style.color,
-        bg: style.bg,
+        icon: row.icon || "bi-grid-fill",
+        color: row.color || "#1c6b41",
+        bg: "#e8f5ec",
         company_count: Number(row.company_count || 0),
       };
     });
@@ -152,13 +131,14 @@ exports.addCompany = async (req, res) => {
       latitude,
       longitude,
       description,
-      working_hours
+      working_hours,
+      category_id
     } = req.body;
 
     const [result] = await db.query(
       `INSERT INTO companies
-      (company_name, phone, email, address, latitude, longitude, description, working_hours)
-      VALUES (?,?,?,?,?,?,?,?)`,
+      (company_name, phone, email, address, latitude, longitude, description, working_hours, category_id)
+      VALUES (?,?,?,?,?,?,?,?,?)`,
       [
         company_name,
         phone,
@@ -167,7 +147,8 @@ exports.addCompany = async (req, res) => {
         latitude,
         longitude,
         description,
-        working_hours || null
+        working_hours || null,
+        category_id ?? null
       ]
     );
 

@@ -444,7 +444,10 @@ export default function Settings() {
       if (logoInputRef.current) logoInputRef.current.value = "";
 
       const fresh = await systemCtx.refresh(); // re-fetches once, updates context everywhere
-      if (fresh) setSystem(fresh); // keep the local draft in sync with what actually saved
+      if (fresh) {
+        systemCtx.updateSettings(fresh);
+        setSystem(fresh);
+      }
 
       showModal("System settings updated successfully.", {
         type: "success",

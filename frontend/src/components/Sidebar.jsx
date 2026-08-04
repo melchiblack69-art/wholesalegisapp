@@ -1,8 +1,8 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useSystemSettings } from "../context/SystemSettingsContext";
 import logo from "../assets/logo.png";
-import { useState, useEffect } from "react";
-import { api } from "../api/client"; // named import
+import { useState } from "react";
 
 const superAdminLinks = [
   { to: "/", label: "Dashboard", icon: "bi-speedometer2", end: true },
@@ -51,23 +51,9 @@ export default function Sidebar({
   onToggleCollapsed,
 }) {
   const { user, logout } = useAuth();
+  const systemSettings = useSystemSettings();
   const navigate = useNavigate();
-  const [systemDetail, setSystemDetail] = useState({});
-  useEffect(() => {
-  const getSystemDetail = async () => {
-    try {
-      const detail = await api.get("/api/system/sys-details");
-      setSystemDetail(detail);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-  getSystemDetail();
-
-  const onUpdate = (e) => setSystemDetail(e.detail);
-  window.addEventListener("system-details-updated", onUpdate);
-  return () => window.removeEventListener("system-details-updated", onUpdate);
-}, []);
+  const systemDetail = systemSettings;
 
   const isCompanyUser =
     user?.role === "warehouse_manager" || user?.role === "warehouse_user";

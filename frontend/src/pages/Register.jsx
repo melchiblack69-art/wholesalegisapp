@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { categories } from "../data/categories";
+import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
@@ -18,6 +18,11 @@ export default function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    api.get("/api/auth/categories").then((rows) => setCategories(Array.isArray(rows) ? rows : [])).catch(() => {});
+  }, []);
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -86,7 +91,7 @@ export default function Register() {
               <select required className="form-select" value={form.category} onChange={update("category")}>
                 <option value="">Select category</option>
                 {categories.map((c) => (
-                  <option key={c.slug} value={c.slug}>{c.name}</option>
+                  <option key={c.id} value={c.id}>{c.category_name || c.name}</option>
                 ))}
               </select>
             </div>

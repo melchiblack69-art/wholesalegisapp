@@ -5,8 +5,6 @@ import StatCard from "../components/StatCard";
 import StatusBadge from "../components/StatusBadge";
 import AdminMap from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
-import { companies, TOTAL_COMPANIES } from "../data/companies";
-import { categories } from "../data/categories";
 import { useAuth } from "../context/AuthContext";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
@@ -24,7 +22,7 @@ export default function AdminDashboard() {
   const recent = [...companyRows].sort((a, b) => new Date(b.created_at || b.addedOn || 0) - new Date(a.created_at || a.addedOn || 0)).slice(0, 3);
   const activeCount = companyRows.filter((c) => String(c.status).toLowerCase() === "active").length;
   const activePct = companyRows.length ? ((activeCount / companyRows.length) * 100).toFixed(1) : "0.0";
-  const chartData = categoryRows.map((category) => ({ name: category.category_name || category.name, value: Number(category.company_count || 0), color: category.color || "#1c6b41", icon: category.icon || "bi-grid-fill" }));
+  const chartData = categoryRows.map((category) => ({ name: category.category_name, value: category.company_count, color: category.color || "#1c6b41", icon: category.icon || "bi-building" }));
   const totalCatCompanies = chartData.reduce((s, d) => s + d.value, 0);
 
   const isAdmin = user?.role === "super_admin";
@@ -33,14 +31,23 @@ export default function AdminDashboard() {
     const loadDashboard = async () => {
       try {
         setLoading(true);
-        const [statsRes, companiesRes, categoriesRes] = await Promise.all([
+        const [statsRes, companiesRes] = await Promise.all([
           api.get("/api/auth/dashboard"),
-          api.get("/api/auth/companies"),
-          api.get("/api/company/categories")
+          api.get("/api/auth/companies")
         ]);
         setStats(statsRes || {});
-        setCompanyRows(Array.isArray(companiesRes) ? companiesRes : []);
-        setCategoryRows(Array.isArray(categoriesRes) ? categoriesRes : []);
+        const rows = Array.isArray(companiesRes) ? companiesRes : []; 
+        setCompanyRows(rows);
+        const grouped = new Map();
+        rows.forEach((company) => {
+          const id = company.category_id || company.cat_id || company.category_name;
+          const name = company.category_name || "Uncategorized";
+          const icon = company.icon || "bi-building";
+          if (!grouped.has(String(id))) grouped.set(String(id), { category_name: name, 
+            company_count: 0, color: company.category_color  || company.color || "#1c6b41", icon: icon });
+          grouped.get(String(id)).company_count += 1;
+        });
+        setCategoryRows(Array.from(grouped.values()));
       } catch (error) {
         setMessage(error.message || "Could not load dashboard data.");
       } finally {

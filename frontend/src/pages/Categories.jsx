@@ -4,7 +4,6 @@ import StatusBadge from "../components/StatusBadge";
 import TableToolbar from "../components/TableToolbar";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
-import { categories as seedCategories } from "../data/categories";
 import { useModal } from "../context/ModalContext";
 //import { iconOptions } from "../data/icons";
 const iconOptions = ["bi-house-door-fill", "bi-lightning-charge-fill",
@@ -18,8 +17,8 @@ function normalizeCategory(item) {
     name: item.category_name || item.name || "",
     icon: item.icon || iconOptions[0],
     slug: (item.category_name || item.name || "").toLowerCase().replace(/\s+/g, "-"),
-    color: item.color || seedCategories.find((entry) => entry.name.toLowerCase() === (item.category_name || item.name || "").toLowerCase() || entry.slug === (item.category_name || item.name || "").toLowerCase().replace(/\s+/g, "-"))?.color || "#1c6b41",
-    bg: item.bg || seedCategories.find((entry) => entry.name.toLowerCase() === (item.category_name || item.name || "").toLowerCase() || entry.slug === (item.category_name || item.name || "").toLowerCase().replace(/\s+/g, "-"))?.bg || "#e8f5ec",
+    color: item.color || "#1c6b41",
+    bg: item.bg || "#e8f5ec",
     companies: item.company_count || 0,
     status: item.status || "Active",
   };
@@ -30,7 +29,7 @@ export default function Categories() {
   const [categories, setCategories] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", icon: iconOptions[0] });
+  const [form, setForm] = useState({ name: "", icon: iconOptions[0], color: "#1c6b41" });
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [q, setQ] = useState("");
   const {showModal} = useModal();
@@ -58,12 +57,12 @@ export default function Categories() {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ name: "", icon: iconOptions[0] });
+    setForm({ name: "", icon: iconOptions[0], color: "#1c6b41" });
     setModalOpen(true);
   };
   const openEdit = (cat) => {
     setEditing(cat);
-    setForm({ name: cat.name, icon: cat.icon });
+    setForm({ name: cat.name, icon: cat.icon, color: cat.color });
     setModalOpen(true);
   };
 
@@ -75,15 +74,17 @@ export default function Categories() {
         const updated = await api.put(`/api/company/categories/${editing.id}`, {
           category_name: form.name,
           category_icon: form.icon,
+          category_color: form.color,
         });
-        const payload = updated?.category || { id: editing.id, category_name: form.name, icon: form.icon };
+        const payload = updated?.category || { id: editing.id, category_name: form.name, icon: form.icon, color: form.color };
         setCategories((prev) => prev.map((c) => (c.id === editing.id ? normalizeCategory(payload) : c)));
       } else {
         const created = await api.post("/api/company/categories", {
           category_name: form.name,
           category_icon: form.icon,
+          category_color: form.color,
         });
-        const payload = created?.category || { id: created?.id, category_name: form.name, icon: form.icon };
+        const payload = created?.category || { id: created?.id, category_name: form.name, icon: form.icon, color: form.color };
         setCategories((prev) => [normalizeCategory(payload), ...prev]);
       }
       setModalOpen(false);
@@ -221,6 +222,8 @@ export default function Categories() {
               />
             </div>
             <div className="mb-4">
+              <label className="form-label">Category color</label>
+              <input type="color" className="form-control form-control-color d-block mb-3" value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} title="Choose category color" />
               <label className="form-label">Icon</label>
               <div className="d-flex flex-wrap gap-2">
                 {iconOptions.map((icon) => (
@@ -232,9 +235,8 @@ export default function Categories() {
                     style={{
                       width: 44,
                       height: 44,
-                      background:
-                        form.icon === icon ? "var(--color-primary)" : "#fff",
-                      color: form.icon === icon ? "#fff" : "var(--color-text)",
+                        background: form.icon === icon ? form.color : "#fff",
+                        color: form.icon === icon ? "#fff" : form.color,
                       border:
                         form.icon === icon
                           ? "2px solid var(--color-primary)"

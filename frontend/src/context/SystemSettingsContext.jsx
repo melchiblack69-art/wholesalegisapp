@@ -18,6 +18,10 @@ export function SystemSettingsProvider({ children }) {
   const [settings, setSettings] = useState(FALLBACK);
   const [loaded, setLoaded] = useState(false);
 
+  const updateSettings = (next) => {
+    setSettings((current) => ({ ...current, ...next }));
+  };
+
   const refresh = async () => {
     try {
         const data = await api.get("/api/system/sys-details");
@@ -45,7 +49,7 @@ export function SystemSettingsProvider({ children }) {
   }, []);
 
   return (
-    <SystemSettingsContext.Provider value={{ ...settings, loaded, refresh }}>
+    <SystemSettingsContext.Provider value={{ ...settings, loaded, refresh, updateSettings }}>
       {children}
     </SystemSettingsContext.Provider>
   );

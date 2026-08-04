@@ -3,30 +3,32 @@ import Topbar from "../components/Topbar";
 import AdminMap from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
-import { categories as seedCategories } from "../data/categories";
+import { useModal } from "../context/ModalContext";
 
 export default function MapManage() {
   const { openSidebar } = useSidebar();
-  const [activeCats, setActiveCats] = useState(seedCategories.map((c) => c.slug));
+  const [activeCats, setActiveCats] = useState([]);
+  const [categoryRows, setCategoryRows] = useState([]);
   const [query, setQuery] = useState("");
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const { openModal } = useModal();
 
   useEffect(() => {
     const loadCompanies = async () => {
       try {
         setLoading(true);
-        const rows = await api.get("/api/map/companies");
+        const rows = await api.get("/api/auth/companies");
         const normalized = Array.isArray(rows)
           ? rows.map((company) => {
-              const seed = seedCategories.find((item) => item.name === company.category_name || item.slug === company.category_name || String(item.id) === String(company.cat_id));
-              const categorySlug = seed?.slug || (company.category_name || "others").toLowerCase().replace(/\s+/g, "-");
+              const categoryId = String(company.category_id || company.cat_id || company.category_name || "uncategorized");
               return {
                 id: company.id,
                 name: company.name || company.company_name,
-                category: categorySlug,
+                category: categoryId,
                 category_name: company.category_name,
+                category_color: company.category_color || company.color || "var(--color-primary)",
                 lat: Number(company.latitude || 0),
                 lng: Number(company.longitude || 0),
                 status: company.status || "Active",
@@ -34,8 +36,12 @@ export default function MapManage() {
             })
           : [];
         setCompanies(normalized);
+        const unique = Array.from(new Map(normalized.map((c) => [c.category, { id: c.category, name: c.category_name || "Uncategorized" }])).values());
+        setCategoryRows(unique);
+        setActiveCats(unique.map((c) => c.id));
       } catch (error) {
-        setMessage(error.message || "Could not load map companies.");
+      showModal(error.message || "Could not load map companies.", 
+          { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2000, confirmText: false });
       } finally {
         setLoading(false);
       }
@@ -52,8 +58,8 @@ export default function MapManage() {
   const toggleCat = (slug) =>
     setActiveCats((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
 
-  const allChecked = activeCats.length === seedCategories.length;
-  const toggleAll = () => setActiveCats(allChecked ? [] : seedCategories.map((c) => c.slug));
+  const allChecked = activeCats.length === categoryRows.length;
+  const toggleAll = () => setActiveCats(allChecked ? [] : categoryRows.map((c) => c.id));
 
   return (
     <>
@@ -79,17 +85,17 @@ export default function MapManage() {
                 <input className="form-check-input" type="checkbox" id="all-layers" checked={allChecked} onChange={toggleAll} />
                 <label className="form-check-label" htmlFor="all-layers">All Companies</label>
               </div>
-              {seedCategories.map((c) => (
-                <div className="form-check mb-2" key={c.slug}>
-                  <input className="form-check-input" type="checkbox" id={`layer-${c.slug}`} checked={activeCats.includes(c.slug)} onChange={() => toggleCat(c.slug)} />
-                  <label className="form-check-label" htmlFor={`layer-${c.slug}`}>{c.name}</label>
+              {categoryRows.map((c) => (
+                <div className="form-check mb-2" key={c.id}>
+                  <input className="form-check-input" type="checkbox" id={`layer-${c.id}`} checked={activeCats.includes(c.id)} onChange={() => toggleCat(c.id)} />
+                  <label className="form-check-label" htmlFor={`layer-${c.id}`}>{c.name}</label>
                 </div>
               ))}
 
               <p className="fw-semibold mt-4 mb-2" style={{ fontSize: "0.9rem" }}>Legend</p>
-              {seedCategories.map((c) => (
-                <div className="d-flex align-items-center gap-2 mb-2" key={c.slug}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: c.color, display: "inline-block" }} />
+              {categoryRows.map((c, index) => (
+                <div className="d-flex align-items-center gap-2 mb-2" key={c.id}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: `hsl(${(index * 67) % 360} 65% 45%)`, display: "inline-block" }} />
                   <span style={{ fontSize: "0.85rem" }}>{c.name}</span>
                 </div>
               ))}

@@ -420,7 +420,7 @@ exports.getAllCompanies = async (req, res) => {
     const [rows] = await db.query(
       `SELECT c.id, c.company_name, c.phone,
               c.email, c.address, c.latitude, c.longitude,c.working_hours, c.description, c.status, c.created_at,
-              g.category_name AS category_name, g.id AS cat_id,
+              g.category_name AS category_name, g.id AS cat_id, g.color AS category_color, g.icon,
               (
                 SELECT COUNT(*) FROM products
                 WHERE company_id = c.id
@@ -479,7 +479,7 @@ exports.getMyCompanyDetails = async (req, res) => {
         c.status,
         c.created_at,
         g.id AS cat_id,
-        g.category_name
+        g.category_name, g.color AS category_color
       FROM companies c
       LEFT JOIN categories g
         ON c.category_id = g.id

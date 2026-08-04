@@ -5,7 +5,6 @@ import StatusBadge from "../components/StatusBadge";
 import AdminMap from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
-import { getCategory } from "../data/categories";
 
 function formatTimeToAmPm(value) {
   if (!value) return "--";
@@ -28,6 +27,7 @@ export default function CompanyView() {
   const [activeImage, setActiveImage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [category, setCategory] = useState(null);
 
   useEffect(() => {
     let ignore = false;
@@ -36,10 +36,16 @@ export default function CompanyView() {
     Promise.all([
       api.get(`/api/auth/mycompany/${id}`),
       api.get(`/api/company/${id}/images`),
+      api.get("/api/auth/companies"),
     ])
-      .then(([companyData, imageResponse]) => {
+      .then(([companyData, imageResponse, categoryRows]) => {
         if (ignore) return;
         setCompany(companyData || null);
+        const categoryId = companyData?.cat_id || companyData?.category_id;
+        setCategory((Array.isArray(categoryRows) ? categoryRows : []).find((row) =>
+          String(row.category_id || row.cat_id) === String(categoryId) ||
+          row.category_name === companyData?.category_name
+        ) || null);
         setImages(Array.isArray(imageResponse?.images) ? imageResponse.images : []);
         setActiveImage(0);
       })
@@ -78,7 +84,9 @@ export default function CompanyView() {
     );
   }
 
-  const cat = getCategory(company.category || company.cat_id || company.category_name);
+  const categoryName = category?.category_name || company.category_name || company.category || "Uncategorized";
+  const categoryColor = category?.color || "var(--color-primary)";
+  const categoryBg = category?.bg || "var(--color-bg)";
 
   return (
     <>
@@ -121,7 +129,7 @@ export default function CompanyView() {
                   <h2 className="fw-bold mb-0 font-display" style={{ fontSize: "1.3rem" }}>{company.company_name || company.name}</h2>
                   <StatusBadge status={company.status} />
                 </div>
-                <span className="fw-medium" style={{ color: cat.color, fontSize: "0.88rem" }}>{cat.name}</span>
+                <span className="fw-medium" style={{ color: categoryColor, fontSize: "0.88rem" }}>{categoryName}</span>
 
                 <div className="d-flex flex-column gap-2 mt-3">
                   <div className="d-flex align-items-start gap-2 text-muted-brand">
@@ -170,7 +178,7 @@ export default function CompanyView() {
                 <div className="d-flex flex-wrap gap-2">
                   {Array.isArray(company.products) && company.products.length > 0 ? (
                     company.products.map((p) => (
-                      <span key={p.product_name || p.name || p} className="badge rounded-pill" style={{ background: cat.bg, color: cat.color, fontWeight: 500 }}>{p.product_name || p.name || p}</span>
+                      <span key={p.product_name || p.name || p} className="badge rounded-pill" style={{ background: categoryBg, color: categoryColor, fontWeight: 500 }}>{p.product_name || p.name || p}</span>
                     ))
                   ) : (
                     <span className="text-muted-brand">No products listed yet.</span>

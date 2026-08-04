@@ -1,7 +1,6 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { useEffect } from "react";
-import { getCategory } from "../data/categories";
 
 export const NIA_CENTER = [5.6037, -0.1870];
 
@@ -57,16 +56,17 @@ export default function AdminMap({
 
         {!pinPosition &&
           companies.map((c) => {
-            const cat = getCategory(c.category || c.category_name || c.cat_id);
+            const categoryName = c.category_name || c.category || "Uncategorized";
+            const categoryColor = c.category_color || c.color || "var(--color-primary)";
             const lat = Number(c.lat ?? c.latitude ?? c.lng);
             const lng = Number(c.lng ?? c.longitude ?? c.lat);
             if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
             return (
-              <Marker key={c.id} position={[lat, lng]} icon={pinIcon(cat.color)}>
+              <Marker key={c.id} position={[lat, lng]} icon={pinIcon(categoryColor)}>
                 <Popup>
                   <div style={{ minWidth: 150 }}>
-                    <div className="fw-semibold">{c.name}</div>
-                    <div style={{ color: cat.color, fontSize: "0.8rem" }}>{cat.name}</div>
+                    <div className="fw-semibold">{c.name || c.company_name}</div>
+                    <div style={{ color: categoryColor, fontSize: "0.8rem" }}>{categoryName}</div>
                     <div className="text-muted-brand" style={{ fontSize: "0.78rem" }}>{c.status}</div>
                   </div>
                 </Popup>
