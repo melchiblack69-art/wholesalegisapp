@@ -33,9 +33,9 @@ router.post("/categories", protect,checkMaintenance, addCategory);
 router.put("/categories/:id", protect, checkMaintenance,updateCategory);
 router.delete("/categories/:id", protect, checkMaintenance, deleteCategory);
 
-router.post("/companies", protect, checkMaintenance,addCompany);
+router.post("/companies", protect, checkMaintenance, addCompany);
 router.put("/companies/:id", protect, checkMaintenance, updateCompany);
-router.delete("/companies/:id", protect,checkMaintenance, deleteCompany);
+router.delete("/del-company/:id", protect, checkMaintenance, deleteCompany);
 
 router.post("/new-product", protect, checkMaintenance,addProduct);
 router.get("/products/:company_id", protect,checkMaintenance, getProducts);

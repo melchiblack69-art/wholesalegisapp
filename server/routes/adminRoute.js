@@ -27,7 +27,6 @@ router.get("/company-name", protect, checkMaintenance, getCompanyName);
 router.get("/dashboard", protect, checkMaintenance,getDashboardDetails);
 router.get("/admins", protect, checkMaintenance, getAllAdmins);
 router.get("/companies", protect, checkMaintenance, getAllCompanies);
-
 //DISPLAY TO COMPANY ADMINS
 router.get("/company-admins", protect, checkMaintenance, getAllCompanyAdmins);
 router.put("/update/:id", protect, checkMaintenance, upload.single("photo"), updateUser);

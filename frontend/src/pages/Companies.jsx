@@ -6,6 +6,7 @@ import Pagination from "../components/Pagination";
 import TableToolbar from "../components/TableToolbar";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
+import {useModal} from "../context/ModalContext";
 
 const PAGE_SIZE = 8;
 
@@ -21,6 +22,7 @@ export default function Companies() {
   const [localCompanies, setLocalCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const {showModal} = useModal();
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -56,7 +58,8 @@ export default function Companies() {
         setCategories(Array.from(categoryMap.values()));
         setLocalCompanies(normalized);
       } catch (error) {
-        setMessage(error.message || "Could not load companies.");
+       showModal(error.message || "Could not fetch data.", { type: "error", title: "Error", 
+        autoClose: true, autoCloseDelay: 2000, confirmText: false });
       } finally {
         setLoading(false);
       }
@@ -78,11 +81,42 @@ export default function Companies() {
   const currentPage = Math.min(page, totalPages);
   const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const handleDelete = (id) => {
+ const handleDelete = async (id) => {
+  try {
+    await api.del(`/api/company/del-company/${id}`);
+
     setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
-    if (page > 1 && pageRows.length === 1) setPage((current) => current - 1);
+
+    if (page > 1 && pageRows.length === 1) {
+      setPage((current) => current - 1);
+    }
+
+
+    // Close the confirmation dialog
     setConfirmDeleteId(null);
-  };
+showModal(
+       "Company deleted.",
+      {
+        type: "success",
+        title: "Success",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      }
+    );
+  } catch (e) {
+    showModal(
+      e.message || "Could not delete this data.",
+      {
+        type: "error",
+        title: "Error",
+        autoClose: true,
+        autoCloseDelay: 2000,
+        confirmText: false,
+      }
+    );
+  }
+};
 
   return (
     <>

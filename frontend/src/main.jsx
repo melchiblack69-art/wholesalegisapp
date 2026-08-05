@@ -16,14 +16,14 @@ import { SystemSettingsProvider } from "./context/SystemSettingsContext.jsx";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
+        <ModalProvider>
       <AuthProvider>
         <SystemSettingsProvider>
-        <ModalProvider>
           <App />
           <GlobalLoader />
-        </ModalProvider>
         </SystemSettingsProvider>
       </AuthProvider>
+        </ModalProvider>
     </BrowserRouter>
   </StrictMode>
 );

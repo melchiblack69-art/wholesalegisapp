@@ -104,15 +104,20 @@ async function delPattern(pattern) {
 
 // ── Cache key constants ───────────────────────────────────────────────────────
 const KEYS = {
-  allCompany:    'company:all',
-  company:        (id) => `company:${id}`,
-  dashboard:   (companyId) => `dashboard:${companyId}`,
-  dashboardAll:   'dashboard:super_admin',
+  // Company
+  company: (id) => `company:${id}`,
+
+  // Company Images
+  companyImages: (companyId) => `company:${companyId}:images`,
+
+  // Dashboard
+  dashboard: (companyId) => `dashboard:${companyId}`,
+  dashboardAll: 'dashboard:super_admin',
 };
 
 // TTLs in seconds
 const TTL = {
-  allCompany:  5  * 60,   // 5 minutes
+  companyImages:  6  * 60,   // 6 minutes
   company:      5  * 60,   // 5 minutes
   dashboard: 2  * 60,   // 2 minutes
   dashboardAll: 2  * 60,   // 2 minutes

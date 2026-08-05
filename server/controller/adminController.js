@@ -323,12 +323,13 @@ exports.deleteAdminPhoto = async (req, res) => {
 
     const publicId = extractPublicId(rows[0].photo);
 
-    // Clear from DB first
-    await db.query("UPDATE users SET photo = NULL WHERE id = ?", [userId]);
-
-    // Then delete from Cloudinary
+    //  Delete from Cloudinary first
     if (publicId) await deleteFromCloudinary(publicId);
 
+    // Then clear from DB 
+    await db.query("UPDATE users SET photo = NULL WHERE id = ?", [userId]);
+
+   // Return the updated results
     const [updated] = await db.query(
       `SELECT id, company_id, name,username, phone,
               email, role, photo
@@ -512,6 +513,7 @@ exports.getMyCompanyDetails = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 // ================= GET ALL ADMINS (SUPER ADMIN) ======================================== */
 exports.getAllAdmins = async (req, res) => {
   try {

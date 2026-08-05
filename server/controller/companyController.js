@@ -220,6 +220,7 @@ exports.updateCompany = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 //delete a company
 exports.deleteCompany = async (req, res) => {
   try {

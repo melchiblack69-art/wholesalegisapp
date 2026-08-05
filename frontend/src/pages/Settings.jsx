@@ -1050,6 +1050,8 @@ export default function Settings() {
               </div>
 
               <div className="row g-3 mt-1">
+                
+                
                 <div className="col-md-4 col-sm-6">
                   <div className="form-check form-switch">
                     <input
@@ -1062,19 +1064,23 @@ export default function Settings() {
                         updateSystemField("maintenance_mode", e.target.checked)
                       }
                     />
+                   
                     <label className="form-check-label" htmlFor="maintenance">
                       Maintenance Mode
                     </label>
                   </div>
                 </div>
               </div>
-              <button
-                className="btn btn-brand rounded-3 mt-4 px-4"
+              <div  className="d-flex justify-content-end gap-2 flex-wrap">
+                 <button
+                className="btn btn-brand rounded-3 mt-3 px-4"
                 onClick={saveSystemDetails}
                 disabled={savingSystem}
               >
                 {savingSystem ? "Saving..." : "Save Settings"}
               </button>
+              </div>
+             
             </div>
           ))}
       </div>

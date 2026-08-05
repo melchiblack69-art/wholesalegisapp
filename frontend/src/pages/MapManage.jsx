@@ -19,7 +19,7 @@ export default function MapManage() {
     const loadCompanies = async () => {
       try {
         setLoading(true);
-        const rows = await api.get("/api/auth/companies");
+        const rows = await api.get("/api/map/companies");
         const normalized = Array.isArray(rows)
           ? rows.map((company) => {
               const categoryId = String(company.category_id || company.cat_id || company.category_name || "uncategorized");
@@ -28,7 +28,7 @@ export default function MapManage() {
                 name: company.name || company.company_name,
                 category: categoryId,
                 category_name: company.category_name,
-                category_color: company.category_color || company.color || "var(--color-primary)",
+                category_color: company.color  || "var(--color-primary)",
                 lat: Number(company.latitude || 0),
                 lng: Number(company.longitude || 0),
                 status: company.status || "Active",
@@ -36,7 +36,8 @@ export default function MapManage() {
             })
           : [];
         setCompanies(normalized);
-        const unique = Array.from(new Map(normalized.map((c) => [c.category, { id: c.category, name: c.category_name || "Uncategorized" }])).values());
+        const unique = Array.from(new Map(normalized.map((c) => [c.category, 
+          { id: c.category, name: c.category_name || "Uncategorized" ,category_color: c.category_color || "var(--color-primary)", }])).values());
         setCategoryRows(unique);
         setActiveCats(unique.map((c) => c.id));
       } catch (error) {
@@ -95,7 +96,7 @@ export default function MapManage() {
               <p className="fw-semibold mt-4 mb-2" style={{ fontSize: "0.9rem" }}>Legend</p>
               {categoryRows.map((c, index) => (
                 <div className="d-flex align-items-center gap-2 mb-2" key={c.id}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: `hsl(${(index * 67) % 360} 65% 45%)`, display: "inline-block" }} />
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: c.category_color, display: "inline-block" }} />
                   <span style={{ fontSize: "0.85rem" }}>{c.name}</span>
                 </div>
               ))}

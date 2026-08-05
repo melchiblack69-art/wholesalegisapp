@@ -17,6 +17,7 @@ function parseProducts(value = "") {
 }
 
 export default function CompanyForm() {
+  const { showModal } = useModal();
   const { openSidebar } = useSidebar();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -44,8 +45,7 @@ export default function CompanyForm() {
     phone: "",
     email: "",
     address: "",
-    description: "",
-    products: "",
+    description: ""
   });
   const [pin, setPin] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -156,7 +156,6 @@ export default function CompanyForm() {
     }));
 
     setImages((prev) => [...prev, ...pendingImages]);
-    setMessage("");
 
     try {
       for (const item of pendingImages) {
@@ -266,10 +265,11 @@ export default function CompanyForm() {
         await api.post("/api/company/companies", payload);
       }
 
-      setSaved(true);
-      setTimeout(() => navigate(COMPANY_MANAGEMENT_ROLES.includes(user?.role) ? "/my-company" : "/companies"), 900);
+      showModal("Company Information Saved.", { type: "success", title: "Success", 
+        autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      setTimeout(() => navigate(COMPANY_MANAGEMENT_ROLES.includes(user?.role) ? "/my-company" : "/companies"), 3000);
     } catch (error) {
-      showModal(error.message || "Could not save company.", { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2500, confirmText: false });
+      showModal(error.message || "Could not save company.", { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2000, confirmText: false });
     }
   };
 
@@ -382,11 +382,6 @@ export default function CompanyForm() {
                 <p className="text-muted-brand mb-2" style={{ fontSize: "0.82rem" }}>
                   Stand at the company's location and tap the button to automatically set the map pin to your current location.
                 </p>
-                {locationError && (
-                  <div className="alert-brand-danger mb-2" style={{ fontSize: "0.8rem" }}>
-                    <i className="bi bi-exclamation-circle-fill me-2" />{locationError}
-                  </div>
-                )}
                 <AdminMap pinPosition={pin} height={220} center={pin || NIA_CENTER} zoom={pin ? 16 : 13} />
                 <div className="row g-2 mt-2">
                   <div className="col-6">
