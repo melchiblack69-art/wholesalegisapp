@@ -20,7 +20,7 @@ app.use(cors({
     "http://localhost:3000",
     "https://dashboard-41ru.onrender.com",
     "http://localhost:3001",
-    "https://admin-portal-c3a6.onrender.com",
+    "https://niawholesalelocator.onrender.com",
     /\.ngrok-free\.app$/,
     /\.trycloudflare\.com$/,
   ],
