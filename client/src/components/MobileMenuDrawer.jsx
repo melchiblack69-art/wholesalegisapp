@@ -12,9 +12,9 @@ const links = [
 export default function MobileMenuDrawer({ open, onClose }) {
 
     const systemCtx = useSystemSettings();
-    const systemName = systemCtx.system_name ;
-    const systemLogo = systemCtx.system_logo ;  
-    const otherName = systemCtx.other_name ;
+    const systemName = systemCtx?.system_name ;
+    const systemLogo = systemCtx?.system_logo ;  
+    const otherName = systemCtx?.other_name ;
   
 
   return (

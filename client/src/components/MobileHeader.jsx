@@ -13,9 +13,9 @@ export default function MobileHeader({
 }) {
   const navigate = useNavigate();
   const systemCtx = useSystemSettings();
-  const systemName = systemCtx.system_name ;
-  const systemLogo = systemCtx.system_logo ;  
-  const otherName = systemCtx.other_name ;
+  const systemName = systemCtx?.system_name ;
+  const systemLogo = systemCtx?.system_logo ;  
+  const otherName = systemCtx?.other_name ;
 
   return (
     <header
