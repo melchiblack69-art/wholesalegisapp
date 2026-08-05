@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-
+import { useSystemSettings } from "../context/SystemSettingsContext.jsx";
 /**
  * variant="home"  -> hamburger + brand + notification bell
  * variant="back"  -> back arrow + title + optional right icons
@@ -12,6 +12,10 @@ export default function MobileHeader({
   rightIcons = null,
 }) {
   const navigate = useNavigate();
+  const systemCtx = useSystemSettings();
+  const systemName = systemCtx.system_name ;
+  const systemLogo = systemCtx.system_logo ;  
+  const otherName = systemCtx.other_name ;
 
   return (
     <header
@@ -41,13 +45,19 @@ export default function MobileHeader({
 
         {variant === "home" ? (
           <div className="d-flex align-items-center gap-1">
-            <i className="bi bi-geo-alt-fill text-primary-brand" />
+            <span
+              className="icon-circle bg-primary-brand text-white d-flex align-items-center justify-content-center"
+              style={{ width: 32, height: 32 }}
+            >
+              <img  src={systemLogo} alt="North Industrial Area Wholesale Locator"
+                         className="sidebar-logo" />
+            </span>
             <div className="d-flex flex-column lh-1">
               <span className="fw-bold" style={{ fontSize: "0.85rem" }}>
-                NORTH INDUSTRIAL AREA
+                {systemName}
               </span>
               <span className="text-muted-brand" style={{ fontSize: "0.68rem" }}>
-                Wholesale Locator
+                {otherName}
               </span>
             </div>
           </div>

@@ -182,21 +182,30 @@ h1, h2, h3, .font-display {
 .sidebar-link.active { background: var(--sidebar-active); color: #fff; }
 
 .sidebar-logo-wrap {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   border-radius: 50%;
   overflow: hidden;
   display: grid;
   place-items: center;
-  background: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 .sidebar-logo {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 35%;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  object-position: center;
+  border-radius: inherit;
+}
+
+.admin-sidebar.collapsed .sidebar-logo-wrap {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
 }
 
 /* ---------- Global modal ---------- */

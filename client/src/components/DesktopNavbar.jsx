@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useSystemSettings } from "../context/SystemSettingsContext";
 
 const links = [
   { to: "/", label: "Home", end: true },
@@ -10,6 +11,11 @@ const links = [
 ];
 
 export default function DesktopNavbar() {
+
+  const systemCtx = useSystemSettings();
+  const systemName = systemCtx.system_name ;
+  const systemLogo = systemCtx.system_logo ;
+  const otherName = systemCtx.other_name ;
   return (
     <nav
       className="d-none d-lg-flex align-items-center position-fixed top-0 start-0 w-100 bg-white border-bottom px-4"
@@ -21,14 +27,15 @@ export default function DesktopNavbar() {
             className="icon-circle bg-primary-brand text-white"
             style={{ width: 38, height: 38 }}
           >
-            <i className="bi bi-geo-alt-fill fs-5" />
+           <img  src={systemLogo} alt="North Industrial Area Wholesale Locator"
+                         className="sidebar-logo" />
           </span>
           <span className="d-flex flex-column lh-1">
             <span className="fw-bold text-dark" style={{ fontSize: "1.05rem" }}>
-              NORTH INDUSTRIAL AREA
+              {systemName}
             </span>
             <span className="text-muted-brand" style={{ fontSize: "0.72rem" }}>
-              Wholesale Locator
+              {otherName}
             </span>
           </span>
         </NavLink>

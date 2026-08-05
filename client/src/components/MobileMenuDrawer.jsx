@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-
+import { useSystemSettings } from "../context/SystemSettingsContext.jsx";
 const links = [
   { to: "/", label: "Home", icon: "bi-house", end: true },
   { to: "/companies", label: "Companies", icon: "bi-shop", end: false },
@@ -10,6 +10,13 @@ const links = [
 ];
 
 export default function MobileMenuDrawer({ open, onClose }) {
+
+    const systemCtx = useSystemSettings();
+    const systemName = systemCtx.system_name ;
+    const systemLogo = systemCtx.system_logo ;  
+    const otherName = systemCtx.other_name ;
+  
+
   return (
     <>
       <div
@@ -36,10 +43,11 @@ export default function MobileMenuDrawer({ open, onClose }) {
         <div className="p-3 border-bottom d-flex align-items-center justify-content-between">
           <div className="d-flex align-items-center gap-2">
             <span className="icon-circle bg-primary-brand text-white" style={{ width: 34, height: 34 }}>
-              <i className="bi bi-geo-alt-fill" />
+              <img  src={systemLogo} alt="North Industrial Area Wholesale Locator"
+                         className="sidebar-logo" />
             </span>
             <span className="fw-bold" style={{ fontSize: "0.9rem" }}>
-              NIA Wholesale Locator
+              USER: 00210
             </span>
           </div>
           <button className="btn btn-sm border-0" onClick={onClose} aria-label="Close menu">
