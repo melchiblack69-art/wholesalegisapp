@@ -44,9 +44,19 @@ export function SystemSettingsProvider({ children }) {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  refresh();
+
+  const handleFocus = () => {
     refresh();
-  }, []);
+  };
+
+  window.addEventListener("focus", handleFocus);
+
+  return () => {
+    window.removeEventListener("focus", handleFocus);
+  };
+}, []);
 
   return (
     <SystemSettingsContext.Provider value={{ ...settings, loaded, refresh, updateSettings }}>
