@@ -22,7 +22,7 @@ frontend/dist/
 build/
 turfarena-gis-admin/
 turfarena-gis-user/
-
+client/dist/
 # OS
 .DS_Store
 Thumbs.db

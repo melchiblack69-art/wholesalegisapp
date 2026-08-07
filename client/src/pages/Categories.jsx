@@ -1,8 +1,14 @@
 import MobileHeader from "../components/MobileHeader";
 import CategoryCard from "../components/CategoryCard";
-import { categories } from "../data/categories";
+import { useState, useEffect } from "react";
+import { api } from "../api/client";
 
 export default function Categories() {
+  const [categories, setCategories] = useState([]);
+  useEffect(() => {
+    api.get("/api/user/categories").then((rows) => setCategories(Array.isArray(rows) ? rows : [])).catch(() => {});
+  }, []);
+
   return (
     <>
       <MobileHeader variant="back" title="Categories" />
@@ -14,7 +20,7 @@ export default function Categories() {
 
         <div className="row g-3">
           {categories.map((c) => (
-            <div className="col-6 col-lg-4" key={c.slug}>
+            <div className="col-6 col-lg-4" key={c.id}>
               <CategoryCard category={c} variant="full" />
             </div>
           ))}

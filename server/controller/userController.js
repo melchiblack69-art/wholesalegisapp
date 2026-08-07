@@ -27,88 +27,121 @@ const extractPublicId = (url) => {
 // Route must use: upload.single('photo') middleware before this handler
 exports.register = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    if (
-      req.user?.role !== "user" 
-    )
-      return res.status(403).json({ message: "Not authorized" });
+    const { name, email, phone, password } = req.body;
 
-    const { name, phone, email, role, password } = req.body;
-
-    const [exists] = await db.query("SELECT id FROM users WHERE email = ?", [
-      email,
-    ]);
-    if (exists.length)
-      return res.status(400).json({ message: "Email already exists" });
-
-    if (!name  || !password)
-      return res.status(400).json({ message: "Some fields are missing" });
-
-    const hashed = await bcrypt.hash(password, 10);
-
-    // Upload photo to Cloudinary if provided
-    let photoUrl = null;
-    if (req.file) {
-      const result = await uploadToCloudinary(
-        req.file.buffer,
-        "gis_system/profiles",
-        `user_${userId}_${Date.now()}`,
-      );
-      photoUrl = result.secure_url;
+    // ── 1. Validate required fields ───────────────────────────
+    if (!name || !phone || !password) {
+      return res.status(400).json({
+        message: "All fields are required.",
+      });
     }
 
+    // ── 2. Check if email or phone already exists ─────────────
+    const [exists] = await db.query(
+      `SELECT id
+       FROM users
+       WHERE (email = ? OR phone = ?)
+       AND role = "user"
+       LIMIT 1`,
+      [email, phone]
+    );
+
+    if (exists.length) {
+      return res.status(400).json({
+        message: "Email or phone already exists.",
+      });
+    }
+
+    // ── 3. Hash password ──────────────────────────────────────
+    const hashed = await bcrypt.hash(password, 10);
+
+    // ── 4. Create user ────────────────────────────────────────
     await db.query(
       `INSERT INTO users
-       (name, phone, 
-        email, password, photo)
-       VALUES (?,?,?,?,?)`,
+       (name, phone, email, password, role)
+       VALUES (?, ?, ?, ?, ?)`,
       [
         name,
         phone,
         email,
         hashed,
-        photoUrl,
-      ],
+        "user",
+      ]
     );
 
-    res.status(201).json({ message: "Registration successful" });
+    // ── 5. Response ───────────────────────────────────────────
+    return res.status(201).json({
+      message: "Account created successfully",
+    });
+
   } catch (err) {
     console.error("register error:", err);
-    res.status(500).json({ error: err.message });
+
+    return res.status(500).json({
+      error: err.message,
+    });
   }
 };
 
 /* ================= LOGIN ================= */
 exports.login = async (req, res) => {
   const { email, password } = req.body;
+
   try {
     if (!email || !password) {
       return res.status(400).json({
         message: "Authentication field and password are required.",
       });
     }
-    // ── 1. Check Admin ──────────────────────────────────────────
+
+    // ── 1. Check user ──────────────────────────────────────────
     const [rows] = await db.query(
-      `SELECT id, name, email,  phone, password, role, photo FROM users
-WHERE email = ? OR phone = ? AND role = "user"
-LIMIT 1`,
-      [email, email],
+      `SELECT 
+        id,
+        name,
+        email,
+        phone,
+        password,
+        role,
+        photo,
+        last_login
+       FROM users
+       WHERE (email = ? OR phone = ?)
+       AND role = "user"
+       LIMIT 1`,
+      [email, email]
     );
 
-    if (!rows.length)
-      return res.status(401).json({ message: "Invalid credentials" });
+    if (!rows.length) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
+    }
 
     const user = rows[0];
+
+    // ── 2. Check password ─────────────────────────────────────
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: "Invalid credentials" });
-    await db.query("UPDATE users SET last_login = NOW() WHERE id = ?", [
-      user.id,
-    ]);
+
+    if (!match) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    // ── 3. Update last login ──────────────────────────────────
+    await db.query(
+      "UPDATE users SET last_login = NOW() WHERE id = ?",
+      [user.id]
+    );
+
+    // ── 4. Generate JWT ───────────────────────────────────────
     const token = generateToken({
       id: user.id,
       role: user.role,
     });
 
+    // ── 5. Return response ────────────────────────────────────
     return res.json({
       message: "Login successful",
       token,
@@ -119,12 +152,16 @@ LIMIT 1`,
         role: user.role,
         photo: user.photo ?? null,
         phone: user.phone,
-        lastLogin: user.last_login,
+        lastLogin: new Date(),
       },
     });
+
   } catch (err) {
     console.error("login error:", err);
-    return res.status(500).json({ error: err.message });
+
+    return res.status(500).json({
+      error: err.message,
+    });
   }
 };
 
@@ -172,78 +209,93 @@ exports.changePassword = async (req, res) => {
 
 /* ================= UPDATE USER ============================================
    Handles text fields + optional photo in one FormData request.
-   Route: PUT /api/auth/update/:id  (upload.single('photo') middleware)       */
+   Route: PUT /api/user/update/:id  (upload.single('photo') middleware)       */
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params?.id;
-    if (String(req.user?.id) !== String(userId))
-      return res
-        .status(403)
-        .json({ message: "You can only update your own profile" });
 
-    // Verify admin exists + get current photo for cleanup
-    const [rows] = await db.query("SELECT id, photo FROM users WHERE id = ?", [
-      userId,
-    ]);
-    if (!rows.length)
-      return res.status(404).json({ message: "Record not found" });
+    // ── 1. Make sure user can only update their own profile ───
+    if (String(req.user?.id) !== String(userId)) {
+      return res.status(403).json({
+        message: "You can't update this profile",
+      });
+    }
+
+    // ── 2. Verify user exists ─────────────────────────────────
+    const [rows] = await db.query(
+      `SELECT id, name, email, phone, photo FROM users WHERE id = ? AND role = 'user' `,
+      [userId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({
+        message: "Account not found",
+      });
+    }
 
     const fields = [];
     const values = [];
 
-    // Text fields
-    ["name", "phone", "email"].forEach((key) => {
-      if (req.body[key] !== undefined) {
+    // ── 3. Only update fields supplied by the user ────────────
+    const allowedFields = ["name", "phone", "email"];
+
+    allowedFields.forEach((key) => {
+      if (
+        req.body[key] !== undefined &&
+        req.body[key] !== null
+      ) {
         fields.push(`${key} = ?`);
         values.push(req.body[key]);
       }
     });
 
-    // Photo — only if a new file was uploaded
-    let newPhotoUrl = null;
-    if (req.file) {
-      const result = await uploadToCloudinary(
-        req.file.buffer,
-        "gis_system/profiles",
-        `user_${userId}_${Date.now()}`,
-      );
-      newPhotoUrl = result.secure_url;
-      fields.push("photo = ?");
-      values.push(newPhotoUrl);
+    // ── 4. Nothing to update ──────────────────────────────────
+    if (!fields.length) {
+      return res.status(400).json({
+        message: "Nothing to update",
+      });
     }
 
-    if (!fields.length) return res.json({ message: "Nothing to update" });
-
-    await db.query(`UPDATE users SET ${fields.join(", ")} WHERE id = ?`, [
-      ...values,
-      userId,
-    ]);
-
-    // Delete old photo from Cloudinary AFTER successful DB save
-    if (req.file && rows[0].photo) {
-      const oldPublicId = extractPublicId(rows[0].photo);
-      if (oldPublicId) await deleteFromCloudinary(oldPublicId).catch(() => {});
-    }
-
-    // Return updated admin so frontend can sync immediately
-    const [updated] = await db.query(
-      `SELECT id, name,phone,
-              email, role, photo
-       FROM users WHERE id = ?`,
-      [userId],
+    // ── 5. Update user ────────────────────────────────────────
+    await db.query(
+      `UPDATE users
+       SET ${fields.join(", ")}
+       WHERE id = ?`,
+      [...values, userId]
     );
 
-    res.json({ message: "Record updated successfully", user: updated[0] });
+    // ── 6. Return updated user ────────────────────────────────
+    const [updated] = await db.query(
+      `SELECT
+        id,
+        name,
+        phone,
+        email,
+        role,
+        photo
+       FROM users
+       WHERE id = ?`,
+      [userId]
+    );
+
+    return res.json({
+      message: "Account updated successfully",
+      user: updated[0],
+    });
+
   } catch (err) {
     console.error("updateUser error:", err);
-    res.status(500).json({ error: "Server Error ⚠️" });
+
+    return res.status(500).json({
+      error: "Server Error ⚠️",
+    });
   }
 };
 
 /* ================= UPLOAD ADMIN PHOTO =====================================
-   PUT /api/auth/admins/:id/photo
+   PUT /api/user/:id/photo
    Expects: upload.single('photo') middleware on the route               */
-exports.uploadAdminPhoto = async (req, res) => {
+exports.uploadUserPhoto = async (req, res) => {
   try {
     const userId = req.params?.id;
     if (!req.file)
@@ -293,9 +345,9 @@ exports.uploadAdminPhoto = async (req, res) => {
   }
 };
 
-/* ================= DELETE ADMIN PHOTO =====================================
-   DELETE /api/auth/admins/:id/photo                                      */
-exports.deleteAdminPhoto = async (req, res) => {
+/* ================= DELETE USER PHOTO =====================================
+   DELETE /api/user/:id/photo                                      */
+exports.deleteUserPhoto = async (req, res) => {
   try {
     const userId = req.params?.id;
 
@@ -308,11 +360,11 @@ exports.deleteAdminPhoto = async (req, res) => {
 
     const publicId = extractPublicId(rows[0].photo);
 
-    // Clear from DB first
-    await db.query("UPDATE users SET photo = NULL WHERE id = ?", [userId]);
-
-    // Then delete from Cloudinary
+    // Delete from first Cloudinary
     if (publicId) await deleteFromCloudinary(publicId);
+
+    // Then clear from DB 
+    await db.query("UPDATE users SET photo = NULL WHERE id = ?", [userId]);
 
     const [updated] = await db.query(
       `SELECT id, name, phone,
@@ -329,7 +381,7 @@ exports.deleteAdminPhoto = async (req, res) => {
   }
 };
 
-/* ================= DELETE ADMIN (COMPANY) ========================================== */
+/* ================= DELETE USER ACCOUNT (BY USER) ========================================== */
 exports.deleteUserAccount = async (req, res) => {
   try {
     const targetId = req.params.id;
@@ -362,37 +414,6 @@ exports.deleteUserAccount = async (req, res) => {
   }
 };
 
-/* ================= GET BY COMPANIES (USER) ======================================= */
-exports.getCompanies = async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      `SELECT id, company_id, name,username, phone,
-              email, role, photo, created_at
-       FROM users WHERE id = ?`,
-    );
-    if (!rows.length)
-      return res.status(404).json({ message: "Admin not found" });
-
-    res.json(rows[0]); // photo is already a Cloudinary URL or null
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-/* ================= GET SINGLE COMPANY (USER) ======================================== */
-exports.getSingleCompany = async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      `SELECT id, company_id, name,username, phone,
-              email, role, photo, last_login, created_at
-       FROM users WHERE company_id = ?`,
-      [req.auth?.company_id],
-    );
-    res.json(rows); // photos are already Cloudinary URLs or null
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
 /* ================= GET ALL COMPANIES (USER) ======================================== */
 exports.getAllCompanies = async (req, res) => {
@@ -404,7 +425,8 @@ exports.getAllCompanies = async (req, res) => {
               (
                 SELECT COUNT(*) FROM products
                 WHERE company_id = c.id
-              ) AS total_products
+              ) AS total_products,
+              COALESCE((SELECT JSON_ARRAYAGG(product_name) FROM products p2 WHERE p2.company_id = c.id), JSON_ARRAY()) AS products
        FROM companies c
        LEFT JOIN categories g ON c.category_id = g.id
        ORDER BY c.created_at DESC`,
@@ -416,97 +438,6 @@ exports.getAllCompanies = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-/* ================= GET MY COMPANY DETAILS (COMPANY ADMIN) ======================================== */
-exports.getMyCompanyDetails = async (req, res) => {
-  try {
-    const admin_id = req.auth?.id;
-    const company_id = req.params.company_id;
-    const userRole = req.auth?.role;
-    const userCompanyId = req.auth?.company_id;
-
-    if (!admin_id) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    if (
-      userRole &&
-      !["super_admin", "warehouse_manager", "warehouse_user"].includes(userRole)
-    ) {
-      return res.status(403).json({ message: "Unauthorized role" });
-    }
-
-    if (
-      (userRole === "warehouse_manager" || userRole === "warehouse_user") &&
-      String(userCompanyId) !== String(company_id)
-    ) {
-      return res
-        .status(403)
-        .json({ message: "You can only view your own company" });
-    }
-
-    const [company] = await db.query(
-      `
-      SELECT
-        c.id,
-        c.company_name,
-        c.phone,
-        c.email,
-        c.address,
-        c.latitude,
-        c.longitude,
-        c.working_hours,
-        c.description,
-        c.status,
-        c.created_at,
-        g.id AS cat_id,
-        g.category_name, g.color AS category_color
-      FROM companies c
-      LEFT JOIN categories g
-        ON c.category_id = g.id
-      WHERE c.id = ?
-      `,
-      [company_id],
-    );
-
-    if (!company.length) {
-      return res.status(404).json({ message: "Company not found" });
-    }
-
-    const [products] = await db.query(
-      `
-      SELECT
-        id,
-        product_name
-      FROM products
-      WHERE company_id = ?
-      ORDER BY product_name
-      `,
-      [company_id],
-    );
-
-    company[0].products = products;
-    company[0].total_products = products.length;
-    res.json(company[0]);
-  } catch (err) {
-    console.error("getMyCompanyDetails error:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-// ================= GET ALL ADMINS (SUPER ADMIN) ======================================== */
-exports.getAllAdmins = async (req, res) => {
-  try {
-    if (req.auth?.role !== "super_admin")
-      return res.status(403).json({ message: "Super admin access required" });
-    const [rows] = await db.query(
-      `SELECT id, company_id, name,username, phone,
-              email, role, photo, created_at, last_login
-       FROM users WHERE role IN ('super_admin', 'warehouse_manager', 'warehouse_user','user')`,
-    );
-    res.json(rows); // photos are already Cloudinary URLs or null
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
 /* ================= GET ME ================================================ */
 exports.getMe = async (req, res) => {
@@ -514,7 +445,7 @@ exports.getMe = async (req, res) => {
     const [rows] = await db.query(
       `SELECT id, name, email, phone, role, photo
        FROM users WHERE id = ?`,
-      [req.auth?.id],
+      [req.user?.id],
     );
     if (!rows.length)
       return res.status(404).json({ message: "Invalid credentials" });
@@ -532,15 +463,25 @@ exports.getCompanyDetail = async (req, res) => {
       `SELECT c.id, c.company_name, c.phone, c.email, c.address,
               c.latitude, c.longitude, c.working_hours, c.description,
               c.status, c.created_at, g.category_name, g.id AS cat_id, g.color AS category_color,
-              (SELECT COUNT(*) FROM products WHERE company_id = c.id) AS total_products
+              (SELECT COUNT(*) FROM products) AS total_products
        FROM companies c
        LEFT JOIN categories g ON c.category_id = g.id
        WHERE c.id = ?`,
       [req.params.id],
     );
+  const [products] = await db.query(
+  `SELECT id, product_name
+   FROM products
+   WHERE company_id = ?`,
+  [req.params.id]
+);
 
     if (!rows.length) return res.status(404).json({ message: "Company not found" });
-    res.json(rows[0]);
+
+    res.json({
+  ...rows[0],
+  products,
+});
   } catch (err) {
     console.error("getCompanyDetail error:", err);
     res.status(500).json({ message: "Server error" });
@@ -549,12 +490,104 @@ exports.getCompanyDetail = async (req, res) => {
 
 /* ================= CONTACT / HELP ================= */
 exports.help = async (req, res) => {
-  const { name, email, message } = req.body?.form ?? req.body ?? {};
+  const { name, email, message } = req.body;
 
   if (!name || !email || !message) {
     return res.status(400).json({ message: "Name, email, and message are required" });
   }
 
+  await db.query("INSERT INTO help (name, email, message) VALUES(?,?,?)", [
+    name, email, message
+  ]);
+
   res.status(201).json({ message: "Contact form received" });
 };
 
+//get all categories (SUPER ADMIN)
+exports.getCategories = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        c.id,
+        c.category_name,
+        c.icon,
+        c.color,
+        COUNT(co.id) AS company_count
+      FROM categories c
+      LEFT JOIN companies co ON co.category_id = c.id
+      GROUP BY c.id, c.category_name, c.icon
+      ORDER BY c.id DESC
+    `);
+
+    const categories = rows.map((row) => {
+      return {
+        id: row.id,
+        category_name: row.category_name,
+        icon: row.icon || "bi-grid-fill",
+        color: row.color || "#1c6b41",
+        bg: "#e8f5ec",
+        company_count: Number(row.company_count || 0),
+      };
+    });
+
+    res.json(categories);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+// ──User:  stats ─────────────────────────────────────────────────
+exports.getStats = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT 
+        (SELECT COUNT(*) FROM companies) AS total_companies,
+        (SELECT COUNT(*) FROM products) AS total_products,
+        (SELECT COUNT(*) FROM categories) AS total_categories`,
+    );
+
+    const payload = rows[0];
+    res.json(payload);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getCompaniesByCategory = async (req, res) => {
+    const categoryId = req.params.categoryId;
+    try {
+    const [rows] = await db.query(
+      `SELECT c.id, c.company_name, c.phone, c.email, c.address,
+              c.latitude, c.longitude, c.working_hours, c.description,
+              c.status, c.created_at, g.category_name, g.id AS cat_id, g.color AS category_color,
+              (SELECT COUNT(*) FROM products WHERE company_id = c.id) AS total_products,
+              COALESCE((SELECT JSON_ARRAYAGG(product_name) FROM products p2 WHERE p2.company_id = c.id), JSON_ARRAY()) AS products
+       FROM companies c
+       LEFT JOIN categories g ON c.category_id = g.id
+       WHERE c.category_id = ?`,
+      [categoryId],
+    );
+
+    if (!rows.length) return res.status(404).json({ message: "Companies not found" });
+    res.json(rows);
+  } catch (err) {
+    console.error("getCompanyDetail error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+//get all products for a company
+exports.getProducts = async (req, res) => {
+  try {
+    const company_id = req.params?.id;
+    const [rows] = await db.query(`
+      SELECT * FROM products 
+      WHERE company_id = ?
+      `, [company_id]);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  };
+}

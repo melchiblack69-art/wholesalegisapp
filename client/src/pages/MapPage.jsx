@@ -2,44 +2,92 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import CompanyMap, { NIA_CENTER } from "../components/CompanyMap";
-import { companies } from "../data/companies";
-import { categories, getCategory } from "../data/categories";
+import { api } from "../api/client";
 import { companyImageUrl } from "../utils/image";
 import { useFavorites } from "../context/FavoritesContext";
+import { haversineDistance } from "../utils/haversine";
 
 export default function MapPage() {
-  const [activeCats, setActiveCats] = useState(categories.map((c) => c.slug));
-  const [locationQuery, setLocationQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
-  const { isFavorite, toggleFavorite } = useFavorites();
 
-  const filtered = useMemo(
-    () => companies.filter((c) => activeCats.includes(c.category)),
-    [activeCats]
+  const [selectedId, setSelectedId] = useState(null);
+ const { isFavorite, toggleFavorite } = useFavorites();
+
+  const [activeCats, setActiveCats] = useState([]);
+  const [categoryRows, setCategoryRows] = useState([]);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [userPosition, setUserPosition] = useState(null);
+
+  
+  useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        setLoading(true);
+        const rows = await api.get("/api/user/map");
+        const normalized = Array.isArray(rows)
+          ? rows.map((company) => {
+              const categoryId = String(company.category_id || company.cat_id || company.category_name || "uncategorized");
+              return {
+                id: company.id,
+                name: company.name || company.company_name,
+                category: categoryId,
+                category_name: company.category_name,
+                category_color: company.color  || "var(--color-primary)",
+                lat: Number(company.latitude),
+                lng: Number(company.longitude),
+                status: company.status || "Active",
+              };
+            })
+          : [];
+        setCompanies(normalized);
+        const unique = Array.from(new Map(normalized.map((c) => [c.category, 
+          { id: c.category, name: c.category_name || "Uncategorized" ,category_color: c.category_color || "var(--color-primary)", }])).values());
+        setCategoryRows(unique);
+        setActiveCats(unique.map((c) => c.id));
+      } catch (error) {
+      setMessage(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCompanies();
+  }, []);
+
+ const filtered = useMemo(
+    () => companies.filter((c) => activeCats.includes(c.category) && (!locationQuery || [c.name, c.category_name, c.address].some((value) => (value || "").toLowerCase().includes(locationQuery.toLowerCase())))),
+    [activeCats, companies, locationQuery]
   );
 
   const nearest = useMemo(
-    () => [...filtered].sort((a, b) => a.distanceKm - b.distanceKm)[0],
-    [filtered]
+    () => [...filtered].map((c) => ({ ...c, distanceKm: userPosition ? haversineDistance(userPosition.lat, userPosition.lng, c.lat, c.lng) : null })),
+    [filtered, userPosition]
   );
 
-  // default the sheet to the nearest company; keep selection if user taps a marker
-  useEffect(() => {
-    if (!selectedId && nearest) setSelectedId(nearest.id);
-  }, [nearest, selectedId]);
+  const getCategory = (slug) =>
+  categoryRows.find((c) => c.id === slug) || categoryRows[0];
 
-  const selected = filtered.find((c) => c.id === selectedId) || nearest;
+  const selected = nearest.find((c) => c.id === selectedId) || null;
   const selectedCat = selected ? getCategory(selected.category) : null;
   const favorited = selected ? isFavorite(selected.id) : false;
 
-  const toggleCat = (slug) => {
-    setActiveCats((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+
+  // default the sheet to the nearest company; keep selection if user taps a marker
+  const locateUser = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setUserPosition({ lat: coords.latitude, lng: coords.longitude }),
+      () => setUserPosition(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const allChecked = activeCats.length === categories.length;
-  const toggleAll = () => setActiveCats(allChecked ? [] : categories.map((c) => c.slug));
+  const toggleCat = (slug) =>
+    setActiveCats((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+
+  const allChecked = activeCats.length === categoryRows.length;
+  const toggleAll = () => setActiveCats(allChecked ? [] : categoryRows.map((c) => c.id));
 
   return (
     <>
@@ -61,10 +109,16 @@ export default function MapPage() {
           <button className="btn bg-white rounded-3 shadow-sm px-3 border-0" aria-label="Filters">
             <i className="bi bi-sliders" />
           </button>
+          <button onClick={locateUser} className="btn bg-white rounded-3 shadow-sm px-3 border-0" aria-label="My location">
+            <i className="bi bi-person-fill text-primary-brand" />
+          </button>
         </div>
 
         <CompanyMap
-          companies={filtered}
+          companies={nearest}
+          center={userPosition ? [userPosition.lat, userPosition.lng] : (nearest[0] ? [nearest[0].lat, nearest[0].lng] : NIA_CENTER)}
+          userPosition={userPosition ? [userPosition.lat, userPosition.lng] : null}
+          showUserLocation={Boolean(userPosition)}
           height="100%"
           selectedId={selected?.id}
           onSelect={(id) => setSelectedId(id)}
@@ -146,14 +200,14 @@ export default function MapPage() {
               All Categories
             </label>
           </div>
-          {categories.map((c) => (
-            <div className="form-check mb-2" key={c.slug}>
+          {categoryRows.map((c) => (
+            <div className="form-check mb-2" key={c.id}>
               <input
                 className="form-check-input"
                 type="checkbox"
-                id={c.slug}
-                checked={activeCats.includes(c.slug)}
-                onChange={() => toggleCat(c.slug)}
+                id={c.id}
+                checked={activeCats.includes(c.id)}
+                onChange={() => toggleCat(c.id)}
               />
               <label className="form-check-label" htmlFor={c.slug}>
                 {c.name}
@@ -164,22 +218,22 @@ export default function MapPage() {
           <p className="fw-semibold mt-4 mb-2" style={{ fontSize: "0.9rem" }}>
             Legend
           </p>
-          {categories.map((c) => (
-            <div className="d-flex align-items-center gap-2 mb-2" key={c.slug}>
+          {categoryRows.map((c) => (
+            <div className="d-flex align-items-center gap-2 mb-2" key={c.id}>
               <span
-                style={{ width: 12, height: 12, borderRadius: "50%", background: c.color, display: "inline-block" }}
+                style={{ width: 12, height: 12, borderRadius: "50%", background: c.category_color, display: "inline-block" }}
               />
               <span style={{ fontSize: "0.85rem" }}>{c.name}</span>
             </div>
           ))}
 
-          <button className="btn btn-brand-outline w-100 mt-3 rounded-3">
+          <button onClick={locateUser} className="btn btn-brand-outline w-100 mt-3 rounded-3">
             <i className="bi bi-crosshair me-2" /> My Location
           </button>
         </aside>
 
         <div className="flex-fill">
-          <CompanyMap companies={filtered} height={640} zoom={14} selectedId={selected?.id} onSelect={setSelectedId} />
+          <CompanyMap companies={nearest} center={userPosition ? [userPosition.lat, userPosition.lng] : (nearest[0] ? [nearest[0].lat, nearest[0].lng] : NIA_CENTER)} userPosition={userPosition ? [userPosition.lat, userPosition.lng] : null} showUserLocation={Boolean(userPosition)} height={640} zoom={14} selectedId={selected?.id} onSelect={setSelectedId} />
         </div>
       </div>
     </>

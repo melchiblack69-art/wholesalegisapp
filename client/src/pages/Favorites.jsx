@@ -1,13 +1,15 @@
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import CompanyCard from "../components/CompanyCard";
-import { companies } from "../data/companies";
-import { getCategory } from "../data/categories";
+import { useEffect, useState } from "react";
+import { api } from "../api/client";
 import { useFavorites } from "../context/FavoritesContext";
 import { companyImageUrl } from "../utils/image";
 
 export default function Favorites() {
   const { favorites, toggleFavorite } = useFavorites();
+  const [companies, setCompanies] = useState([]);
+  useEffect(() => { api.get("/api/user/companies").then((rows) => setCompanies(Array.isArray(rows) ? rows : [])).catch(() => {}); }, []);
   const favCompanies = companies.filter((c) => favorites.includes(c.id));
 
   return (
@@ -49,7 +51,7 @@ export default function Favorites() {
                 </thead>
                 <tbody>
                   {favCompanies.map((c) => {
-                    const cat = getCategory(c.category);
+                    const cat = { name: c.category_name || "Uncategorized", color: c.category_color || "var(--color-primary)" };
                     return (
                       <tr key={c.id}>
                         <td>

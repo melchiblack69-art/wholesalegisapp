@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const items = [
   { icon: "bi-heart", label: "My Favorites", to: "/favorites" },
@@ -7,10 +8,12 @@ const items = [
   { icon: "bi-share", label: "Share App", to: "#" },
   { icon: "bi-info-circle", label: "About Us", to: "/about" },
   { icon: "bi-question-circle", label: "Help & Support", to: "/contact" },
-  { icon: "bi-gear", label: "Settings", to: "#" },
+  { icon: "bi-gear", label: "Settings", to: "/profile" },
 ];
 
 export default function Menu() {
+  const { user, openAuthModal, logout } = useAuth();
+
   return (
     <div className="d-lg-none">
       <div
@@ -22,22 +25,43 @@ export default function Menu() {
             className="icon-circle bg-white"
             style={{ width: 56, height: 56, color: "var(--color-primary)" }}
           >
-            <i className="bi bi-person-fill fs-3" />
+            {user?.photo ? <img src={user.photo} alt="User" className="profile-nav-photo" /> : <i className="bi bi-person fs-3" />}
           </span>
           <div>
-            <p className="fw-bold mb-0 fs-5">Hello, Guest</p>
+            <p className="fw-bold mb-0 fs-5">
+              {user ? `Hello, ${user.name || user.email}` : "Hello, Guest"}
+            </p>
             <p className="mb-0" style={{ fontSize: "0.85rem", opacity: 0.9 }}>
               Explore wholesale companies around you.
             </p>
           </div>
         </div>
-        <button className="btn btn-light fw-semibold w-100 rounded-3" style={{ color: "var(--color-primary)" }}>
-          Login / Register
-        </button>
+        {user ? (
+          <button
+            className="btn btn-light fw-semibold w-100 rounded-3"
+            style={{ color: "var(--color-primary)" }}
+            onClick={logout}
+          >
+            <i className="bi bi-box-arrow-right me-1"></i>Sign Out
+          </button>
+        ) : (
+          <button
+            className="btn btn-light fw-semibold w-100 rounded-3"
+            style={{ color: "var(--color-primary)" }}
+            onClick={openAuthModal}
+          >
+            Login / Register
+          </button>
+        )}
       </div>
 
       <div className="d-flex flex-column">
         {items.map((it) => (
+          (!user && it.label === "Settings") ? (
+            <button key={it.label} type="button" disabled className="d-flex align-items-center justify-content-between text-muted-brand px-4 py-3 border-bottom bg-transparent border-0 w-100 text-start">
+              <span className="d-flex align-items-center gap-3"><i className={`bi ${it.icon} fs-5`} /><span style={{ fontSize: "0.95rem" }}>{it.label}</span></span><i className="bi bi-lock" />
+            </button>
+          ) : (
           <Link
             key={it.label}
             to={it.to}
@@ -49,6 +73,7 @@ export default function Menu() {
             </span>
             <i className="bi bi-chevron-right text-muted-brand" />
           </Link>
+          )
         ))}
       </div>
     </div>

@@ -3,7 +3,7 @@ import { useSystemSettings } from "../context/SystemSettingsContext";
 
 export default function About() {
   const systemCtx = useSystemSettings();
-  const about = systemCtx?.description || "Hi"  ;
+  const about = systemCtx?.description || "Hi "  ;
   console.log(about);
     return (
     <>

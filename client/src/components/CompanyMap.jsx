@@ -1,8 +1,7 @@
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import { useEffect } from "react";
 import L from "leaflet";
 import { Link } from "react-router-dom";
-import { getCategory } from "../data/categories";
 
 const NIA_CENTER = [5.5715, -0.2298];
 
@@ -23,12 +22,37 @@ function pinIcon(color, active = false) {
   });
 }
 
+function companyIcon(color) {
+  return L.divIcon({ className: "company-map-icon", html: `<span style="background:${color};--marker-color:${color}"><i class="bi bi-buildings"></i></span>`, iconSize: [34, 43], iconAnchor: [17, 21] });
+}
+
+function userIcon() {
+  return L.divIcon({ className: "user-map-icon", html: `<span><i class="bi bi-person-fill"></i><b>You</b></span>`, iconSize: [44, 44], iconAnchor: [22, 22] });
+}
+
 function RecenterOnChange({ center }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, map.getZoom(), { animate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center[0], center[1]]);
+  return null;
+} 
+
+function MapViewController({ center, zoom, pinPosition }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const target = pinPosition || center;
+    if (Array.isArray(target) && target.length === 2) {
+      const lat = Number(target[0]);
+      const lng = Number(target[1]);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        map.setView([lat, lng], zoom, { animate: true, duration: 0.4 });
+      }
+    }
+  }, [map, center, pinPosition, zoom]);
+
   return null;
 }
 
@@ -42,7 +66,9 @@ export default function CompanyMap({
   selectedId = null,
   onSelect = null,
   recenterOnCenterChange = false,
+  userPosition = null,
 }) {
+
   return (
     <div style={{ height, width: "100%", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
       <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
@@ -51,26 +77,29 @@ export default function CompanyMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <MapViewController center={center} zoom={zoom} />
+
         {recenterOnCenterChange && <RecenterOnChange center={center} />}
 
-        {showUserLocation && (
-          <CircleMarker
-            center={center}
-            radius={8}
-            pathOptions={{ color: "#2f6fed", fillColor: "#2f6fed", fillOpacity: 0.9, weight: 3 }}
-          />
-        )}
+        {showUserLocation && <Marker position={userPosition || center} icon={userIcon()}><Tooltip permanent direction="top" offset={[0, -20]}>You</Tooltip></Marker>}
 
         {companies.map((c) => {
-          const cat = getCategory(c.category);
+          const lat = Number(c.lat ?? c.latitude);
+          const lng = Number(c.lng ?? c.longitude);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          const cat = {
+            name: c.category_name || "Uncategorized",
+            color: c.category_color || c.color || "var(--color-primary)",
+          };
           const active = c.id === selectedId;
           return (
             <Marker
               key={c.id}
-              position={[c.lat, c.lng]}
-              icon={pinIcon(cat.color, active)}
+              position={[lat, lng]}
+              icon={companyIcon(cat.color)}
               eventHandlers={onSelect ? { click: () => onSelect(c.id) } : undefined}
             >
+              <Tooltip permanent direction="top" offset={[0, -38]} opacity={0.9}>{c.name}</Tooltip>
               <Popup>
                 <div style={{ minWidth: 160 }}>
                   <div className="fw-semibold">{c.name}</div>

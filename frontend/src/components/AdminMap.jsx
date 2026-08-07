@@ -15,6 +15,14 @@ function pinIcon(color, active = false) {
   return L.divIcon({ html: svg, className: "", iconSize: [size, h], iconAnchor: [size / 2, h] });
 }
 
+function companyIcon(color) {
+  return L.divIcon({ className: "admin-company-map-icon", html: `<span style="background:${color};--marker-color:${color}"><i class="bi bi-buildings"></i></span>`, iconSize: [34, 43], iconAnchor: [17, 21] });
+}
+
+function userIcon() {
+  return L.divIcon({ className: "admin-user-map-icon", html: `<span><i class="bi bi-person-fill"></i><b>You</b></span>`, iconSize: [44, 44], iconAnchor: [22, 22] });
+}
+
 function MapViewController({ center, zoom, pinPosition }) {
   const map = useMap();
 
@@ -51,7 +59,7 @@ export default function AdminMap({
         <MapViewController center={center} zoom={zoom} pinPosition={pinPosition} />
 
         {pinPosition && (
-          <Marker position={pinPosition} icon={pinIcon("#e0405a", true)} />
+          <Marker position={pinPosition} icon={userIcon()} />
         )}
 
         {!pinPosition &&
@@ -62,7 +70,7 @@ export default function AdminMap({
             const lng = Number(c.lng ?? c.longitude ?? c.lat);
             if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
             return (
-              <Marker key={c.id} position={[lat, lng]} icon={pinIcon(categoryColor)}>
+              <Marker key={c.id} position={[lat, lng]} icon={companyIcon(categoryColor)}>
                 <Popup>
                   <div style={{ minWidth: 150 }}>
                     <div className="fw-semibold">{c.name || c.company_name}</div>

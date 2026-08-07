@@ -11,6 +11,7 @@ import Menu from "./pages/Menu";
 import Directions from "./pages/Directions";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import ProfileDisplay from "./pages/Profile";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/menu" element={<Menu />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/profile" element={<ProfileDisplay />} />
         <Route path="*" element={<Home />} />
       </Route>
       </Routes>

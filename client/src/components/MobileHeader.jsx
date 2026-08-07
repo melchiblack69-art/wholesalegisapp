@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useSystemSettings } from "../context/SystemSettingsContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 /**
  * variant="home"  -> hamburger + brand + notification bell
  * variant="back"  -> back arrow + title + optional right icons
@@ -12,6 +13,7 @@ export default function MobileHeader({
   rightIcons = null,
 }) {
   const navigate = useNavigate();
+  const user = useAuth()?.user;
   const systemCtx = useSystemSettings();
   const systemName = systemCtx?.system_name ;
   const systemLogo = systemCtx?.system_logo ;  
@@ -49,8 +51,7 @@ export default function MobileHeader({
               className="icon-circle bg-primary-brand text-white d-flex align-items-center justify-content-center"
               style={{ width: 32, height: 32 }}
             >
-              <img  src={systemLogo} alt="North Industrial Area Wholesale Locator"
-                         className="sidebar-logo" />
+              {systemLogo ? <img src={systemLogo} alt="North Industrial Area Wholesale Locator" className="sidebar-logo" /> : <i className="bi bi-buildings" />}
             </span>
             <div className="d-flex flex-column lh-1">
               <span className="fw-bold" style={{ fontSize: "0.85rem" }}>

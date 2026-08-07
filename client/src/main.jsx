@@ -7,18 +7,20 @@ import "bootstrap-icons/font/bootstrap-icons.css";
 import "leaflet/dist/leaflet.css";
 import "./styles/theme.css";
 import App from "./App.jsx";
+import { AuthProvider } from "./context/AuthContext.jsx";
 import { FavoritesProvider } from "./context/FavoritesContext.jsx";
 import { SystemSettingsProvider } from "./context/SystemSettingsContext.jsx";
-
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
-        <SystemSettingsProvider>
-      <FavoritesProvider>
-          <App />
-      </FavoritesProvider>
-        </SystemSettingsProvider>
+      <SystemSettingsProvider>
+        <AuthProvider>
+          <FavoritesProvider>
+            <App />
+          </FavoritesProvider>
+        </AuthProvider>
+      </SystemSettingsProvider>
     </BrowserRouter>
   </StrictMode>
 );

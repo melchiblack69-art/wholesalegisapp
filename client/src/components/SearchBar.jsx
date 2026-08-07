@@ -7,6 +7,7 @@ export default function SearchBar({
   onFilterClick,
   size = "md",
   autoNavigate = true,
+  onValueChange,
 }) {
   const [value, setValue] = useState(defaultValue);
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function SearchBar({
           style={{ outline: "none", fontSize: "0.95rem" }}
           placeholder={placeholder}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => { setValue(e.target.value); onValueChange?.(e.target.value); }}
         />
         {value && (
           <button

@@ -4,7 +4,7 @@ export const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000"
 //import { showGlobalLoading, hideGlobalLoading } from "../util/loadBus"; // adjust path if you keep loadingBus in utils/
 console.log(BASE_URL);
 
-const TOKEN_KEY = "user_token";
+const TOKEN_KEY = "NIA_user_token";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -68,7 +68,7 @@ async function request(path, { method = "GET", body, isForm = false } = {}) {
           data?.message
         );
 
-        if (path !== "/api/auth/login" && isSessionIssue) {
+        if (path !== "/api/user/login" && isSessionIssue) {
           localStorage.removeItem(TOKEN_KEY);
           if (window.location.pathname !== "/login") {
             window.location.href = "/login";

@@ -11,10 +11,11 @@ const userRoute = require('./routes/userRoute');
 const companyRoute = require("./routes/companyRoute");
 const mapRoute = require("./routes/mapRoute");
 const systemRoute = require("./routes/systemRoute");
+const healthRoute = require("./routes/healthRoute"); // fixed typo
+const startHealthCheckCron = require('./service/cronJob');
 
 const app = express();
 
-// Cors Middleware
 app.use(cors({
   origin: [
     "http://localhost:3000",
@@ -30,30 +31,26 @@ app.use(cors({
 
 app.use(express.json());
 
-// Static files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/images", express.static(path.join(__dirname, "images")));
 
 app.use("/api/auth", adminRoute);
 app.use("/api/user", userRoute);
-
-// Routes
-  
-app.use('/api/system', systemRoute);  
-app.use('/api/company', companyRoute); 
-app.use('/api/company/:id/images', companyImageRoute); 
+app.use('/api/system', systemRoute);
+app.use('/api/company', companyRoute);
+app.use('/api/company/:id/images', companyImageRoute);
 app.use('/api/map', mapRoute);
+app.use('/api', healthRoute); // <-- mounted, gives you GET /api/health
 
 app.get("/", (req, res) => {
   res.send("North Industrial Area GIS Locator API running");
 });
 
-// Connect Redis (non-blocking — server starts even if Redis is unavailable)
 const redis = require('./config/RedisClient');
 redis.connect();
-// Start server
+
 const PORT = process.env.PORT || 8000;
-app.listen(PORT,"0.0.0.0", () => console.log(`Server running on port ${PORT}`));
-
-
- 
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+  startHealthCheckCron(); // now runs after server confirms it's listening
+});

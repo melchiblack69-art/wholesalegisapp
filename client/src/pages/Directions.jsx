@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import L from "leaflet";
 import MobileHeader from "../components/MobileHeader";
-import { getCompany } from "../data/companies";
+import { api } from "../api/client";
 import { NIA_CENTER } from "../components/CompanyMap";
 
 const modes = [
@@ -23,7 +23,8 @@ function dot(color) {
 
 export default function Directions() {
   const { id } = useParams();
-  const company = getCompany(id);
+  const [company, setCompany] = useState(null);
+  useEffect(() => { api.get(`/api/user/companies/${id}`).then(setCompany).catch(() => setCompany(null)); }, [id]);
   const [mode, setMode] = useState("driving");
 
   if (!company) {
@@ -36,7 +37,7 @@ export default function Directions() {
   }
 
   const origin = NIA_CENTER;
-  const destination = [company.lat, company.lng];
+  const destination = [Number(company.latitude), Number(company.longitude)];
   // mock route waypoints — swap for a real GraphHopper polyline once the backend is wired up
   const route = [
     origin,

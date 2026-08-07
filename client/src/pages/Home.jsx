@@ -1,23 +1,41 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import SearchBar from "../components/SearchBar";
 import CategoryCard from "../components/CategoryCard";
 import CompanyCard from "../components/CompanyCard";
 import MobileMenuDrawer from "../components/MobileMenuDrawer";
-import { categories } from "../data/categories";
-import { companies } from "../data/companies";
+import { api } from "../api/client";
+import { haversineDistance } from "../utils/haversine";
 
-const stats = [
-  { icon: "bi-geo-alt-fill", value: "128+", label: "Wholesale Companies" },
-  { icon: "bi-grid-fill", value: "24+", label: "Categories" },
-  { icon: "bi-box-seam-fill", value: "250+", label: "Products" },
-  { icon: "bi-people-fill", value: "5000+", label: "Satisfied Users" },
-];
 
 export default function Home() {
+  const [categories, setCategories] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [stats, setStats] = useState([]);
+  const [position, setPosition] = useState(null);
+
+  useEffect(() => {
+    api.get("/api/user/categories").then((rows) => setCategories(Array.isArray(rows) ? rows : [])).catch(() => {});
+    api.get("/api/user/companies").then((rows) => setCompanies(Array.isArray(rows) ? rows.map((c) => ({ ...c, name: c.name || c.company_name })) : [])).catch(() => {});
+    api.get("/api/user/stats").then((data) => setStats([
+      { icon: "bi-geo-alt-fill", value: `${data?.total_companies || 0}`, label: "Wholesale Companies" },
+      { icon: "bi-grid-fill", value: `${data?.total_categories || 0}`, label: "Categories" },
+      { icon: "bi-box-seam-fill", value: `${data?.total_products || 0}`, label: "Products" },
+    ])).catch(() => {});
+    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setPosition({ lat: coords.latitude, lng: coords.longitude }),
+      () => setPosition(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+  
   const [menuOpen, setMenuOpen] = useState(false);
-  const nearest = [...companies].sort((a, b) => a.distanceKm - b.distanceKm);
+  const nearest = [...companies]
+    .map((company) => ({
+      ...company,
+      distanceKm: position ? haversineDistance(position.lat, position.lng, company.latitude, company.longitude) : null,
+    }))
+    .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
 
   return (
     <>
@@ -83,7 +101,7 @@ export default function Home() {
         </div>
         <div className="row g-2 g-lg-3 px-2 px-lg-0 mb-4">
           {categories.map((c) => (
-            <div className="col-4 col-lg-2" key={c.slug}>
+            <div className="col-4 col-lg-2" key={c.id}>
               <CategoryCard category={c} variant="compact" />
             </div>
           ))}

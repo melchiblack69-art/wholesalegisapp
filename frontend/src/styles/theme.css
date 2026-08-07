@@ -405,6 +405,13 @@ h1, h2, h3, .font-display {
   flex-shrink: 0;
 }
 
+.admin-company-map-icon span,
+.admin-user-map-icon span { display:flex; align-items:center; justify-content:center; width:34px; height:34px; border:3px solid #fff; border-radius:50%; color:#fff; box-shadow:var(--shadow-md); font-size:17px; }
+.admin-company-map-icon span { position:relative; }
+.admin-company-map-icon span::after { content:""; position:absolute; bottom:-9px; left:50%; transform:translateX(-50%); border-left:7px solid transparent; border-right:7px solid transparent; border-top:10px solid var(--marker-color); }
+.admin-user-map-icon span { position:relative; width:30px; height:30px; background:#2f6fed; }
+.admin-user-map-icon b { position:absolute; top:29px; color:#2f6fed; background:#fff; border-radius:5px; padding:1px 4px; font:600 10px Inter,sans-serif; }
+
 /* ---------- Buttons ---------- */
 .btn { transition: box-shadow .15s ease, background-color .15s ease, border-color .15s ease; }
 @media (hover: hover) and (pointer: fine) {

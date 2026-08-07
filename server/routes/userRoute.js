@@ -1,31 +1,39 @@
 const express = require("express");
 const router = express.Router();
 
-const { login, getMe, getAllCompanies, getCompanyDetail, help } = require("../controller/userController");
-const { getCategories } = require("../controller/companyController");
+const { login, getMe, getAllCompanies, getCompanyDetail, help,
+   getCategories,getStats,
+    getCompaniesByCategory, getProducts,
+    register,
+    deleteUserPhoto,
+    deleteUserAccount,
+    updateUser,
+    uploadUserPhoto
+   } = require("../controller/userController");
 const { getMapCompanies } = require("../controller/mapController");
+const { getCompanyImages } = require("../controller/imageController");
 const protect = require("../middleware/user");
 const checkMaintenance = require("../middleware/checkMaintenance");
+const {upload} = require("../middleware/upload");
 
 router.post("/login", login);
 router.get("/me", protect, checkMaintenance, getMe);
-
+router.post("/register", checkMaintenance, register);
+router.put("/update/:id", protect, checkMaintenance, updateUser);
+router.delete("/:id/photo", protect, checkMaintenance,deleteUserPhoto);
+router.put("/:id/photo", protect, checkMaintenance, upload.single("photo"), uploadUserPhoto);
+router.delete("/delete-account/:id", protect, checkMaintenance, deleteUserAccount);
+//
+router.get("/company-product/:id", getProducts);
 router.get("/categories",  getCategories);
 router.get("/companies",  getAllCompanies);
 router.get("/companies/:id",  getCompanyDetail);
 router.get("/company-detail/:id",  getCompanyDetail);
 router.get("/map",  getMapCompanies);
+router.get("/category/:categoryId", getCompaniesByCategory);
+router.get("/company/:id/images", getCompanyImages);
 
-router.get("/about", (_req, res) => {
-  res.json({
-    description:
-      "This platform helps you discover and navigate wholesale companies in the North Industrial Area, Accra.",
-  });
-});
-
-router.post("/contact", (_req, res) => {
-  res.json({ message: "Contact form received" });
-});
 router.post("/help", help);
+router.get("/stats", getStats);
 
 module.exports = router;

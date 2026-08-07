@@ -1,5 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useSystemSettings } from "../context/SystemSettingsContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+
 const links = [
   { to: "/", label: "Home", icon: "bi-house", end: true },
   { to: "/companies", label: "Companies", icon: "bi-shop", end: false },
@@ -10,12 +12,21 @@ const links = [
 ];
 
 export default function MobileMenuDrawer({ open, onClose }) {
+  const systemCtx = useSystemSettings();
+  const systemName = systemCtx?.system_name;
+  const systemLogo = systemCtx?.system_logo;
+  const otherName = systemCtx?.other_name;
+  const { user, openAuthModal, logout } = useAuth();
 
-    const systemCtx = useSystemSettings();
-    const systemName = systemCtx?.system_name ;
-    const systemLogo = systemCtx?.system_logo ;  
-    const otherName = systemCtx?.other_name ;
-  
+  const handleLoginClick = () => {
+    onClose();
+    openAuthModal();
+  };
+
+  const handleSignOutClick = () => {
+    onClose();
+    logout();
+  };
 
   return (
     <>
@@ -43,11 +54,10 @@ export default function MobileMenuDrawer({ open, onClose }) {
         <div className="p-3 border-bottom d-flex align-items-center justify-content-between">
           <div className="d-flex align-items-center gap-2">
             <span className="icon-circle bg-primary-brand text-white" style={{ width: 34, height: 34 }}>
-              <img  src={systemLogo} alt="North Industrial Area Wholesale Locator"
-                         className="sidebar-logo" />
+              {user?.photo ? <img src={user.photo} alt="User" className="profile-nav-photo" /> : <i className="bi bi-person" />}
             </span>
-            <span className="fw-bold" style={{ fontSize: "0.9rem" }}>
-              USER: 00210
+            <span className="fw-bold" style={{ fontSize: "0.6rem" }}>
+              {user ? user.name || user.email : "Guest"}
             </span>
           </div>
           <button className="btn btn-sm border-0" onClick={onClose} aria-label="Close menu">
@@ -72,7 +82,15 @@ export default function MobileMenuDrawer({ open, onClose }) {
           ))}
         </nav>
         <div className="p-3 mt-auto">
-          <button className="btn btn-brand w-100 rounded-3">Login / Register</button>
+          {user ? (
+            <button className="btn btn-brand-outline w-100 rounded-3 fw-semibold" onClick={handleSignOutClick}>
+              <i className="bi bi-box-arrow-right me-1"></i>Sign Out
+            </button>
+          ) : (
+            <button className="btn btn-brand w-100 rounded-3" onClick={handleLoginClick}>
+              Login / Register
+            </button>
+          )}
         </div>
       </aside>
     </>
