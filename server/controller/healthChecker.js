@@ -1,66 +1,50 @@
 // controller/healthChecker.js
 const db = require("../config/db");
 const redis = require("../config/RedisClient");
-
-// Safely parse REDIS_URL to get host/port without exposing credentials
-function getRedisConnectionInfo() {
-  const url = process.env.REDIS_URL;
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    return {
-      host: parsed.hostname,
-      port: parsed.port || "6379",
-    };
-  } catch {
-    return { host: "unparseable" };
-  }
-}
+const { sendHealthAlert } = require("../service/mailer");
 
 exports.checkHealth = async (req, res) => {
   const result = {
     status: "ok",
-    database: {
-      status: "unknown",
-      host: process.env.DB_HOST || "unknown",
-      name: process.env.DB_NAME || "unknown",
-    },
-    redis: {
-      status: "unknown",
-      ...getRedisConnectionInfo(),
-    },
+    database: "unknown",
+    redis: "unknown",
     timestamp: new Date().toISOString(),
   };
 
   let dbHealthy = false;
 
-  // Check database — critical
   try {
     await db.query("SELECT 1");
-    result.database.status = "connected";
+    result.database = "connected";
     dbHealthy = true;
   } catch (error) {
     console.error("[Health Check] Database failed:", error.message);
-    result.database.status = "unavailable";
+    result.database = "unavailable";
   }
 
-  // Check Redis — optional, degrades gracefully
   if (!process.env.REDIS_URL) {
-    result.redis.status = "disabled";
+    result.redis = "disabled";
   } else if (redis.isReady()) {
     const alive = await redis.ping();
-    result.redis.status = alive ? "connected" : "unresponsive";
+    result.redis = alive ? "connected" : "unresponsive";
   } else {
-    result.redis.status = "disconnected";
+    result.redis = "disconnected";
   }
 
-  if (dbHealthy) {
-    result.status = (result.redis.status === "connected" || result.redis.status === "disabled") ? "ok" : "degraded";
-    console.log("[Health Check]", result.status, "-", JSON.stringify(result));
+  const redisOk = result.redis === "connected" || result.redis === "disabled";
+
+  if (dbHealthy && redisOk) {
+    result.status = "ok";
     return res.status(200).json(result);
-  } else {
-    result.status = "error";
-    console.log("[Health Check] Critical failure:", JSON.stringify(result));
-    return res.status(503).json(result);
   }
+
+  result.status = dbHealthy ? "degraded" : "error";
+  console.log("[Health Check] Issue detected:", JSON.stringify(result));
+
+  // Fire alert email — don't block the response on it
+  sendHealthAlert(result).catch((err) =>
+    console.error("[Health Alert] Failed to send email:", err.message)
+  );
+
+  return res.status(dbHealthy ? 200 : 503).json(result);
 };
