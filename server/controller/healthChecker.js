@@ -2,11 +2,33 @@
 const db = require("../config/db");
 const redis = require("../config/RedisClient");
 
+// Safely parse REDIS_URL to get host/port without exposing credentials
+function getRedisConnectionInfo() {
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parsed.port || "6379",
+    };
+  } catch {
+    return { host: "unparseable" };
+  }
+}
+
 exports.checkHealth = async (req, res) => {
   const result = {
     status: "ok",
-    database: "unknown",
-    redis: "unknown",
+    database: {
+      status: "unknown",
+      host: process.env.DB_HOST || "unknown",
+      name: process.env.DB_NAME || "unknown",
+    },
+    redis: {
+      status: "unknown",
+      ...getRedisConnectionInfo(),
+    },
     timestamp: new Date().toISOString(),
   };
 
@@ -15,31 +37,30 @@ exports.checkHealth = async (req, res) => {
   // Check database — critical
   try {
     await db.query("SELECT 1");
-    result.database = "connected";
+    result.database.status = "connected";
     dbHealthy = true;
   } catch (error) {
     console.error("[Health Check] Database failed:", error.message);
-    result.database = "unavailable";
+    result.database.status = "unavailable";
   }
 
   // Check Redis — optional, degrades gracefully
   if (!process.env.REDIS_URL) {
-    result.redis = "disabled";
+    result.redis.status = "disabled";
   } else if (redis.isReady()) {
     const alive = await redis.ping();
-    result.redis = alive ? "connected" : "unresponsive";
+    result.redis.status = alive ? "connected" : "unresponsive";
   } else {
-    result.redis = "disconnected";
+    result.redis.status = "disconnected";
   }
 
-  // Only DB failure makes the service "down"
   if (dbHealthy) {
-    result.status = result.redis === "connected" || result.redis === "disabled" ? "ok" : "degraded";
-    console.log("[Health Check]", result.status, "-", result);
+    result.status = (result.redis.status === "connected" || result.redis.status === "disabled") ? "ok" : "degraded";
+    console.log("[Health Check]", result.status, "-", JSON.stringify(result));
     return res.status(200).json(result);
   } else {
     result.status = "error";
-    console.log("[Health Check] Critical failure:", result);
+    console.log("[Health Check] Critical failure:", JSON.stringify(result));
     return res.status(503).json(result);
   }
 };
