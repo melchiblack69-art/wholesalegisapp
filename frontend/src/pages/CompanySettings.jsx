@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 import Topbar from "../components/Topbar";
 import { useAuth } from "../context/AuthContext";
 import { useSidebar } from "../context/SidebarContext";
@@ -143,7 +144,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
     try {
       setSaving(true);
 
-      await api.put(`/api/auth/change-password/${user.id}`, {
+      await api.put(`/api/auth/change-password/${publicId(user)}`, {
         currentPassword: pwd.current,
         newPassword: pwd.next,
       });
@@ -222,7 +223,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
       formData.append("phone", profile.phone);
       if (selectedPhoto) formData.append("photo", selectedPhoto);
 
-      const data = await api.put(`/api/auth/update/${user.id}`, formData, { isForm: true });
+      const data = await api.put(`/api/auth/update/${publicId(user)}`, formData, { isForm: true });
       updateCurrentUser(data.admin);
       setProfileUser(data.admin);
       clearSelectedPhoto();
@@ -242,7 +243,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
 
     setIsRemovingPhoto(true);
     try {
-      const data = await api.del(`/api/auth/admins/${user.id}/photo`);
+      const data = await api.del(`/api/auth/admins/${publicId(user)}/photo`);
       updateCurrentUser(data.admin);
       setProfileUser(data.admin);
        showModal("Profile photo removed.", { type: "success", title: "Success", 

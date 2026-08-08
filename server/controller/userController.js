@@ -9,6 +9,8 @@ const {
 } = require("../middleware/upload");
 
 const URL = process.env.REACT_APP_URL;
+const { newPublicId, resolveInternalId } = require("../utils/publicId");
+const redis = require("../config/RedisClient");
 
 /* ================= HELPER: extract Cloudinary public_id from URL ========= */
 const extractPublicId = (url) => {
@@ -58,14 +60,15 @@ exports.register = async (req, res) => {
     // ── 4. Create user ────────────────────────────────────────
     await db.query(
       `INSERT INTO users
-       (name, phone, email, password, role)
-       VALUES (?, ?, ?, ?, ?)`,
+       (name, phone, email, password, role, public_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         name,
         phone,
         email,
         hashed,
         "user",
+        newPublicId(),
       ]
     );
 
@@ -98,6 +101,7 @@ exports.login = async (req, res) => {
     const [rows] = await db.query(
       `SELECT 
         id,
+        public_id,
         name,
         email,
         phone,
@@ -147,6 +151,7 @@ exports.login = async (req, res) => {
       token,
       user: {
         id: user.id,
+        public_id: user.public_id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -214,7 +219,7 @@ exports.changePassword = async (req, res) => {
    Route: PUT /api/user/update/:id  (upload.single('photo') middleware)       */
 exports.updateUser = async (req, res) => {
   try {
-    const userId = req.params?.id;
+    const userId = await resolveInternalId(db, "users", req.params?.id);
 
     // ── 1. Make sure user can only update their own profile ───
     if (String(req.user?.id) !== String(userId)) {
@@ -299,7 +304,8 @@ exports.updateUser = async (req, res) => {
    Expects: upload.single('photo') middleware on the route               */
 exports.uploadUserPhoto = async (req, res) => {
   try {
-    const userId = req.params?.id;
+    const userId = await resolveInternalId(db, "users", req.params?.id);
+    if (!userId) return res.status(404).json({ message: "Record not found" });
     if (!req.file)
       return res.status(400).json({ message: "No image provided" });
 
@@ -351,7 +357,8 @@ exports.uploadUserPhoto = async (req, res) => {
    DELETE /api/user/:id/photo                                      */
 exports.deleteUserPhoto = async (req, res) => {
   try {
-    const userId = req.params?.id;
+    const userId = await resolveInternalId(db, "users", req.params?.id);
+    if (!userId) return res.status(404).json({ message: "Record not found" });
 
     const [rows] = await db.query(
       "SELECT photo FROM users WHERE id = ? LIMIT 1",
@@ -386,10 +393,10 @@ exports.deleteUserPhoto = async (req, res) => {
 /* ================= DELETE USER ACCOUNT (BY USER) ========================================== */
 exports.deleteUserAccount = async (req, res) => {
   try {
-    const targetId = req.params.id;
+    const targetId = await resolveInternalId(db, "users", req.params.id);
     const requesterId = req.user?.id;
     const requesterRole = req.user?.role;
-    if (!requesterId)
+    if (!requesterId || !targetId || String(requesterId) !== String(targetId))
       return res.status(403).json({ message: "Access required" });
     if (
       requesterRole !== "user"
@@ -420,10 +427,12 @@ exports.deleteUserAccount = async (req, res) => {
 /* ================= GET ALL COMPANIES (USER) ======================================== */
 exports.getAllCompanies = async (req, res) => {
   try {
+    const cached = await redis.get(redis.KEYS.publicCompanies);
+    if (cached) return res.json(cached);
     const [rows] = await db.query(
-      `SELECT c.id, c.company_name, c.phone,
+      `SELECT c.id, c.public_id, c.company_name, c.phone,
               c.email, c.address, c.latitude, c.longitude,c.working_hours, c.description, c.status, c.created_at,
-              g.category_name AS category_name, g.id AS cat_id, g.color AS category_color,
+              g.category_name AS category_name, g.id AS cat_id, g.public_id AS category_public_id, g.color AS category_color,
               (
                 SELECT COUNT(*) FROM products
                 WHERE company_id = c.id
@@ -434,6 +443,7 @@ exports.getAllCompanies = async (req, res) => {
        ORDER BY c.created_at DESC`,
     );
 
+    await redis.set(redis.KEYS.publicCompanies, rows, redis.TTL.publicCompanies);
     return res.json(rows);
   } catch (err) {
     console.error("getCompanies error:", err);
@@ -445,7 +455,7 @@ exports.getAllCompanies = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, name, email, phone, role, photo
+      `SELECT id, public_id, name, email, phone, role, photo
        FROM users WHERE id = ?`,
       [req.user?.id],
     );
@@ -461,29 +471,36 @@ exports.getMe = async (req, res) => {
 /* ================= GET COMPANY DETAIL (PUBLIC USER VIEW) ================= */
 exports.getCompanyDetail = async (req, res) => {
   try {
+    const companyId = await resolveInternalId(db, "companies", req.params.id);
+    if (!companyId) return res.status(404).json({ message: "Company not found" });
+    const companyCacheKey = redis.KEYS.publicCompany(companyId);
+    const cached = await redis.get(companyCacheKey);
+    if (cached) return res.json(cached);
     const [rows] = await db.query(
-      `SELECT c.id, c.company_name, c.phone, c.email, c.address,
+      `SELECT c.id, c.public_id, c.company_name, c.phone, c.email, c.address,
               c.latitude, c.longitude, c.working_hours, c.description,
-              c.status, c.created_at, g.category_name, g.id AS cat_id, g.color AS category_color,
+              c.status, c.created_at, g.category_name, g.id AS cat_id, g.public_id AS category_public_id, g.color AS category_color,
               (SELECT COUNT(*) FROM products) AS total_products
        FROM companies c
        LEFT JOIN categories g ON c.category_id = g.id
        WHERE c.id = ?`,
-      [req.params.id],
+      [companyId],
     );
   const [products] = await db.query(
   `SELECT id, product_name
    FROM products
    WHERE company_id = ?`,
-  [req.params.id]
+  [companyId]
 );
 
     if (!rows.length) return res.status(404).json({ message: "Company not found" });
 
-    res.json({
+    const payload = {
   ...rows[0],
   products,
-});
+    };
+    await redis.set(companyCacheKey, payload, redis.TTL.publicCompany);
+    res.json(payload);
   } catch (err) {
     console.error("getCompanyDetail error:", err);
     res.status(500).json({ message: "Server error" });
@@ -508,9 +525,12 @@ exports.help = async (req, res) => {
 //get all categories (SUPER ADMIN)
 exports.getCategories = async (req, res) => {
   try {
+    const cached = await redis.get(redis.KEYS.publicCategories);
+    if (cached) return res.json(cached);
     const [rows] = await db.query(`
       SELECT
         c.id,
+        c.public_id,
         c.category_name,
         c.icon,
         c.color,
@@ -524,6 +544,7 @@ exports.getCategories = async (req, res) => {
     const categories = rows.map((row) => {
       return {
         id: row.id,
+        public_id: row.public_id,
         category_name: row.category_name,
         icon: row.icon || "bi-grid-fill",
         color: row.color || "#1c6b41",
@@ -532,6 +553,7 @@ exports.getCategories = async (req, res) => {
       };
     });
 
+    await redis.set(redis.KEYS.publicCategories, categories, redis.TTL.publicCategories);
     res.json(categories);
   } catch (error) {
     console.error(error);
@@ -541,6 +563,8 @@ exports.getCategories = async (req, res) => {
 // ──User:  stats ─────────────────────────────────────────────────
 exports.getStats = async (req, res) => {
   try {
+    const cached = await redis.get(redis.KEYS.publicStats);
+    if (cached) return res.json(cached);
     const [rows] = await db.query(
       `SELECT 
         (SELECT COUNT(*) FROM companies) AS total_companies,
@@ -549,6 +573,7 @@ exports.getStats = async (req, res) => {
     );
 
     const payload = rows[0];
+    await redis.set(redis.KEYS.publicStats, payload, redis.TTL.publicStats);
     res.json(payload);
   } catch (err) {
     console.error(err);
@@ -557,10 +582,14 @@ exports.getStats = async (req, res) => {
 };
 
 exports.getCompaniesByCategory = async (req, res) => {
-    const categoryId = req.params.categoryId;
+    const categoryId = await resolveInternalId(db, "categories", req.params.categoryId);
+    if (!categoryId) return res.status(404).json({ message: "Category not found" });
     try {
+    const cacheKey = redis.KEYS.publicCategoryCompanies(categoryId);
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(cached);
     const [rows] = await db.query(
-      `SELECT c.id, c.company_name, c.phone, c.email, c.address,
+      `SELECT c.id, c.public_id, c.company_name, c.phone, c.email, c.address,
               c.latitude, c.longitude, c.working_hours, c.description,
               c.status, c.created_at, g.category_name, g.id AS cat_id, g.color AS category_color,
               (SELECT COUNT(*) FROM products WHERE company_id = c.id) AS total_products,
@@ -572,6 +601,7 @@ exports.getCompaniesByCategory = async (req, res) => {
     );
 
     if (!rows.length) return res.status(404).json({ message: "Companies not found" });
+    await redis.set(cacheKey, rows, redis.TTL.publicCategoryCompanies);
     res.json(rows);
   } catch (err) {
     console.error("getCompanyDetail error:", err);
@@ -582,11 +612,16 @@ exports.getCompaniesByCategory = async (req, res) => {
 //get all products for a company
 exports.getProducts = async (req, res) => {
   try {
-    const company_id = req.params?.id;
+    const company_id = await resolveInternalId(db, "companies", req.params?.id);
+    if (!company_id) return res.status(404).json({ message: "Company not found" });
+    const cacheKey = redis.KEYS.publicProducts(company_id);
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(cached);
     const [rows] = await db.query(`
       SELECT * FROM products 
       WHERE company_id = ?
       `, [company_id]);
+    await redis.set(cacheKey, rows, redis.TTL.publicProducts);
     res.json(rows);
   } catch (error) {
     console.error(error);

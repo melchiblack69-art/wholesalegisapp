@@ -4,6 +4,7 @@ import Topbar from "../components/Topbar";
 import TableToolbar from "../components/TableToolbar";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 import { useModal } from "../context/ModalContext";
 
 
@@ -59,7 +60,7 @@ export default function CompanyProducts() {
 
     try {
       if (editing) {
-        await api.put(`/api/company/products/${editing.id}`, {
+        await api.put(`/api/company/products/${publicId(editing)}`, {
           company_id: id,
           product_name: form.product_name,
           quantity: Number(form.quantity || 0),
@@ -107,7 +108,7 @@ export default function CompanyProducts() {
 
   const remove = async (productId) => {
     try {
-      await api.del(`/api/company/products/${productId}`);
+      await api.del(`/api/company/products/${publicId(products.find((p) => p.id === productId)) || productId}`);
       setProducts((prev) => prev.filter((p) => p.id !== productId));
       setConfirmDeleteId(null);
       showModal("Product removed.", { type: "info", title: "Info", 

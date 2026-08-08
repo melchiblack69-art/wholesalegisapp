@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import L from "leaflet";
 import MobileHeader from "../components/MobileHeader";
-import { api } from "../api/client";
+import { useCompany } from "../api/queries";
+import LoadingSpinner from "../components/LoadingSpinner";
 import { NIA_CENTER } from "../components/CompanyMap";
 
 const modes = [
@@ -23,11 +24,11 @@ function dot(color) {
 
 export default function Directions() {
   const { id } = useParams();
-  const [company, setCompany] = useState(null);
-  useEffect(() => { api.get(`/api/user/companies/${id}`).then(setCompany).catch(() => setCompany(null)); }, [id]);
+  const { data: company, isLoading, isError } = useCompany(id);
   const [mode, setMode] = useState("driving");
 
-  if (!company) {
+  if (isLoading) return <LoadingSpinner fullScreen />;
+  if (isError || !company) {
     return (
       <div className="container py-5 text-center">
         <p className="fw-semibold">Company not found.</p>
@@ -119,7 +120,7 @@ export default function Directions() {
       {/* ---------- DESKTOP ---------- */}
       <div className="d-none d-lg-flex container-fluid py-4 px-4 gap-4" style={{ maxWidth: 1320, margin: "0 auto" }}>
         <aside style={{ width: 340, flexShrink: 0 }}>
-          <Link to={`/companies/${company.id}`} className="d-inline-flex align-items-center gap-2 text-dark text-decoration-none mb-3">
+          <Link to={`/companies/${company.public_id || company.id}`} className="d-inline-flex align-items-center gap-2 text-dark text-decoration-none mb-3">
             <i className="bi bi-arrow-left" /> Back to {company.name}
           </Link>
           <h1 className="fw-bold mb-3 font-display" style={{ fontSize: "1.3rem" }}>Directions</h1>

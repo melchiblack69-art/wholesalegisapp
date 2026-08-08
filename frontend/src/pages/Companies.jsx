@@ -6,6 +6,7 @@ import Pagination from "../components/Pagination";
 import TableToolbar from "../components/TableToolbar";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 import {useModal} from "../context/ModalContext";
 
 const PAGE_SIZE = 8;
@@ -33,6 +34,7 @@ export default function Companies() {
           ? rows.map((company) => {
               return {
                 id: company.id,
+                public_id: company.public_id,
                 name: company.company_name || company.name,
                 category: String(company.category_id || company.cat_id || ""),
                 category_name: company.category_name || "Uncategorized",
@@ -190,10 +192,10 @@ showModal(
                       <td><StatusBadge status={c.status} /></td>
                       <td>
                         <div className="d-flex align-items-center gap-2">
-                          <button className="btn btn-sm border-0 p-1" title="Edit" onClick={() => navigate(`/company/${c.id}/edit`)}>
+                          <button className="btn btn-sm border-0 p-1" title="Edit" onClick={() => navigate(`/company/${publicId(c)}/edit`)}>
                             <i className="bi bi-pencil text-primary-brand" />
                           </button>
-                          <Link className="btn btn-sm border-0 p-1" to={`/companies/${c.id}`} title="View">
+                          <Link className="btn btn-sm border-0 p-1" to={`/companies/${publicId(c)}`} title="View">
                             <i className="bi bi-eye text-muted-brand" />
                           </Link>
                           <button className="btn btn-sm border-0 p-1" title="Delete" onClick={() => setConfirmDeleteId(c.id)}>

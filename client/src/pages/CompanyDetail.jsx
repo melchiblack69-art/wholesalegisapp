@@ -9,6 +9,9 @@ import ImageCarousel from "../components/ImageCarousel";
 import { api } from "../api/client";
 import { shareCompany } from "../utils/shareCompany";
 import { haversineDistance } from "../utils/haversine";
+import { useCompany, useCompanyImages, useCompanyProducts, useCompanies } from "../api/queries";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { formatDistance } from "../utils/distance";
 
 function formatHours(hours) {
   if (!hours) return "";
@@ -31,25 +34,13 @@ export default function CompanyDetail() {
   //const company = getCompany(id);
   const { isFavorite, toggleFavorite } = useFavorites();
   const [activeProduct, setActiveProduct] = useState(0);
-  const [products, setProduct] = useState([]);
-
-  const [company, setCompany] = useState(null);
+  const { data: company, isLoading: companyLoading, isError: companyError } = useCompany(id);
+  const { data: products = [], isLoading: productsLoading } = useCompanyProducts(id);
+  const { data: images = [], isLoading: imagesLoading } = useCompanyImages(id);
+  const { data: allCompanies = [] } = useCompanies();
   const [nearby, setNearby] = useState([]);
-  const [images, setImages] = useState([]);
   const [userPosition, setUserPosition] = useState(null);
   useEffect(() => {
-    api
-      .get(`/api/user/companies/${id}`)
-      .then((row) => setCompany(row))
-      .catch(() => setCompany(null));
-    api
-      .get(`/api/user/company-product/${id}`)
-      .then((row) => setProduct(row))
-      .catch(() => setProduct(null));
-    api
-      .get(`/api/user/company/${id}/images`)
-      .then((data) => setImages(data?.images || []))
-      .catch(() => {});
     if (navigator.geolocation)
       navigator.geolocation.getCurrentPosition(
         ({ coords }) =>
@@ -57,11 +48,11 @@ export default function CompanyDetail() {
         () => setUserPosition(null),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
       );
-    api
-      .get("/api/user/companies")
-      .then(async (rows) => {
-        const candidates = Array.isArray(rows)
-          ? rows
+  }, [id]);
+
+  useEffect(() => {
+    const candidates = allCompanies
+          ? allCompanies
               .filter((row) => String(row.id) !== String(id))
               .map((row) => ({
                 ...row,
@@ -81,23 +72,24 @@ export default function CompanyDetail() {
               )
               .slice(0, 3)
           : [];
-        const withImages = await Promise.all(
-          candidates.map(async (row) => {
-            try {
-              const data = await api.get(`/api/user/company/${row.id}/images`);
-              const cover =
-                (data?.images || []).find((image) => image.is_cover) ||
-                data?.images?.[0];
-              return { ...row, cover_image: cover?.url || null };
-            } catch {
-              return row;
-            }
-          }),
-        );
-        setNearby(withImages);
-      })
-      .catch(() => {});
-  }, [id, userPosition]);
+    Promise.all(candidates.map(async (row) => {
+      try {
+        const data = await api.get(`/api/user/company/${row.id}/images`);
+        const cover = (data?.images || []).find((image) => image.is_cover) || data?.images?.[0];
+        return { ...row, cover_image: cover?.url || null };
+      } catch {
+        return row;
+      }
+    }))
+      .then(setNearby)
+      .catch(() => setNearby(candidates));
+  }, [allCompanies, id, userPosition]);
+
+  useEffect(() => {
+    if (company?.public_id && String(company.public_id) !== String(id)) {
+      navigate(`/companies/${company.public_id}`, { replace: true });
+    }
+  }, [company, id, navigate]);
 
   const cat = {
     name: company?.category_name || "Uncategorized",
@@ -113,7 +105,8 @@ export default function CompanyDetail() {
     { icon: "bi-clock", text: formatHours(company?.working_hours) },
   ];
 
-  if (!company) {
+  if (companyLoading) return <LoadingSpinner fullScreen />;
+  if (companyError || !company) {
     return (
       <div className="container py-5 text-center">
         <p className="fw-semibold">Company not found.</p>
@@ -166,10 +159,13 @@ export default function CompanyDetail() {
 
         <div className="row g-4">
           <div className="col-lg-8">
-            <ImageCarousel
-              images={images.map((image) => image.url).filter(Boolean)}
-              height={260}
-            />
+            <div className="position-relative" style={{ minHeight: 260 }}>
+              <ImageCarousel
+                images={images.map((image) => image.url).filter(Boolean)}
+                height={260}
+              />
+              {imagesLoading && <LoadingSpinner overlay />}
+            </div>
 
             <div className="px-3 px-lg-0 pt-3">
               <div className="d-flex align-items-start justify-content-between">
@@ -204,7 +200,7 @@ export default function CompanyDetail() {
 
               <div className="d-flex gap-2 mb-4">
                 <Link
-                  to={`/companies/${company.id}/directions`}
+                  to={`/companies/${company.public_id || company.id}/directions`}
                   className="btn btn-brand flex-fill rounded-3"
                 >
                   <i className="bi bi-signpost-2 me-2" /> Get Directions
@@ -221,7 +217,9 @@ export default function CompanyDetail() {
                 Products
               </p>
               <div className="d-flex gap-2 mb-4 flex-wrap">
-                {products.length > 0 ? (
+                {productsLoading ? (
+                  <span className="position-relative d-inline-block" style={{ minHeight: 42, minWidth: 120 }}><LoadingSpinner overlay /></span>
+                ) : products.length > 0 ? (
                   products.map((product, index) => (
                     <button
                       key={product.id || index}
@@ -268,7 +266,7 @@ export default function CompanyDetail() {
                   {nearby.map((n) => (
                     <Link
                       key={n.id}
-                      to={`/companies/${n.id}`}
+                      to={`/companies/${n.public_id || n.id}`}
                       className="d-flex align-items-center justify-content-between text-decoration-none text-dark py-2 border-bottom"
                     >
                       <div className="d-flex align-items-center gap-2">
@@ -303,7 +301,7 @@ export default function CompanyDetail() {
                             className="text-muted-brand"
                             style={{ fontSize: "0.78rem" }}
                           >
-                            {n.distanceKm} km away
+                            {formatDistance(n.distanceKm)} away
                           </span>
                         </div>
                       </div>
@@ -348,7 +346,7 @@ export default function CompanyDetail() {
                 {nearby.map((n) => (
                   <Link
                     key={n.id}
-                    to={`/companies/${n.id}`}
+                    to={`/companies/${n.public_id || n.id}`}
                     className="d-flex align-items-center justify-content-between text-decoration-none text-dark py-2"
                   >
                     <div className="d-flex align-items-center gap-2">
@@ -374,7 +372,7 @@ export default function CompanyDetail() {
                       className="text-muted-brand"
                       style={{ fontSize: "0.78rem" }}
                     >
-                      {n.distanceKm} km away
+                      {formatDistance(n.distanceKm)} away
                     </span>
                   </Link>
                 ))}

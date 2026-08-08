@@ -19,10 +19,6 @@ function companyIcon(color) {
   return L.divIcon({ className: "admin-company-map-icon", html: `<span style="background:${color};--marker-color:${color}"><i class="bi bi-buildings"></i></span>`, iconSize: [34, 43], iconAnchor: [17, 21] });
 }
 
-function userIcon() {
-  return L.divIcon({ className: "admin-user-map-icon", html: `<span><i class="bi bi-person-fill"></i><b>You</b></span>`, iconSize: [44, 44], iconAnchor: [22, 22] });
-}
-
 function MapViewController({ center, zoom, pinPosition }) {
   const map = useMap();
 
@@ -58,9 +54,7 @@ export default function AdminMap({
         <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <MapViewController center={center} zoom={zoom} pinPosition={pinPosition} />
 
-        {pinPosition && (
-          <Marker position={pinPosition} icon={userIcon()} />
-        )}
+        {pinPosition && <Marker position={pinPosition} icon={companyIcon("#1c6b41")} />}
 
         {!pinPosition &&
           companies.map((c) => {

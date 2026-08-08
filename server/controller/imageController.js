@@ -5,11 +5,13 @@ const {
   deleteFromCloudinary,
 } = require("../middleware/upload");
 const redis = require("../config/RedisClient");
+const { resolveInternalId } = require("../utils/publicId");
 
 // ── GET /api/company/:id/images ──────────────────────────────────────────────
 // Returns all images for a company ordered by sort_order
 const getCompanyImages = async (req, res) => {
-  const company_id = parseInt(req.params.id);
+  const company_id = await resolveInternalId(db, "companies", req.params.id);
+  if (!company_id) return res.status(404).json({ message: "Company not found" });
   const cacheKey = redis.KEYS.companyImages(company_id);
   // ── Cache check ───────────────────────────────────────────────────────
   const cached = await redis.get(cacheKey);
@@ -73,7 +75,8 @@ const getCompanyImages = async (req, res) => {
 // First upload auto-sets is_cover = 1 if company has no cover yet
 const uploadCompanyImages = async (req, res) => {
   try {
-    const company_id = parseInt(req.params.id);
+    const company_id = await resolveInternalId(db, "companies", req.params.id);
+    if (!company_id) return res.status(404).json({ message: "Company not found" });
 
     if (!req.files || req.files.length === 0)
       return res.status(400).json({ message: "No images provided" });
@@ -147,13 +150,14 @@ const uploadCompanyImages = async (req, res) => {
 // Set a specific image as the cover (unsets all others for this company)
 const setCompanyCover = async (req, res) => {
   try {
-    const company_id = parseInt(req.params.id);
-    const image_id = parseInt(req.params.imageId);
+    const company_id = await resolveInternalId(db, "companies", req.params.id);
+    if (!company_id) return res.status(404).json({ message: "Company not found" });
+    const imageKey = req.params.imageId;
 
     // Verify image belongs to this company
     const [rows] = await db.query(
-      `SELECT id FROM company_images WHERE id = ? AND company_id = ? LIMIT 1`,
-      [image_id, company_id],
+      `SELECT id FROM company_images WHERE (id = ? OR public_id = ?) AND company_id = ? LIMIT 1`,
+      [imageKey, imageKey, company_id],
     );
     if (!rows.length)
       return res
@@ -165,6 +169,7 @@ const setCompanyCover = async (req, res) => {
       `UPDATE company_images SET is_cover = 0 WHERE company_id = ?`,
       [company_id],
     );
+    const image_id = rows[0].id;
     await db.query(`UPDATE company_images SET is_cover = 1 WHERE id = ?`, [
       image_id,
     ]);
@@ -192,14 +197,15 @@ const setCompanyCover = async (req, res) => {
 // If deleted image was the cover, promotes the next image to cover
 const deleteCompanyImage = async (req, res) => {
   try {
-    const company_id = parseInt(req.params.id);
-    const image_id = parseInt(req.params.imageId);
+    const company_id = await resolveInternalId(db, "companies", req.params.id);
+    if (!company_id) return res.status(404).json({ message: "Company not found" });
+    const imageKey = req.params.imageId;
 
     // Fetch the image to get public_id and is_cover
     const [rows] = await db.query(
       `SELECT id, public_id, is_cover FROM company_images
-       WHERE id = ? AND company_id = ? LIMIT 1`,
-      [image_id, company_id],
+       WHERE (id = ? OR public_id = ?) AND company_id = ? LIMIT 1`,
+      [imageKey, imageKey, company_id],
     );
     if (!rows.length)
       return res
@@ -207,6 +213,7 @@ const deleteCompanyImage = async (req, res) => {
         .json({ message: "Image not found for this Company" });
 
     const image = rows[0];
+    const image_id = image.id;
 
     // Delete from Cloudinary first
     await deleteFromCloudinary(image.public_id);

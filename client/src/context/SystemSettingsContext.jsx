@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api } from "../api/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const SystemSettingsContext = createContext(null);
 
@@ -15,17 +16,12 @@ const FALLBACK = {
 };
 
 export function SystemSettingsProvider({ children }) {
-  const [settings, setSettings] = useState(FALLBACK);
-  const [loaded, setLoaded] = useState(false);
-
-  const updateSettings = (next) => {
-    setSettings((current) => ({ ...current, ...next }));
-  };
-
-  const refresh = async () => {
-    try {
-        const data = await api.get("/api/system/sys-details");
-      const next = {
+  const queryClient = useQueryClient();
+  const { data: settings = FALLBACK, isFetched: loaded, refetch } = useQuery({
+    queryKey: ["system-settings"],
+    queryFn: async () => {
+      const data = await api.get("/api/system/sys-details");
+      return {
         id: data.id,
         system_name: data.system_name || "",
         other_name: data.other_name || "",
@@ -35,20 +31,15 @@ export function SystemSettingsProvider({ children }) {
         description: data.description || "",
         updated_at: data.updated_at || "",
       };
-      setSettings(next);
-      return next;
-    } catch {
-      return null;
-    } finally {
-      setLoaded(true);
-    }
-  };
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+  const updateSettings = (next) => queryClient.setQueryData(["system-settings"], (current = FALLBACK) => ({ ...current, ...next }));
 
  useEffect(() => {
-  refresh();
-
   const handleFocus = () => {
-    refresh();
+    refetch();
   };
 
   window.addEventListener("focus", handleFocus);
@@ -56,10 +47,10 @@ export function SystemSettingsProvider({ children }) {
   return () => {
     window.removeEventListener("focus", handleFocus);
   };
-}, []);
+}, [refetch]);
 
   return (
-    <SystemSettingsContext.Provider value={{ ...settings, loaded, refresh, updateSettings }}>
+    <SystemSettingsContext.Provider value={{ ...settings, loaded, refresh: refetch, updateSettings }}>
       {children}
     </SystemSettingsContext.Provider>
   );

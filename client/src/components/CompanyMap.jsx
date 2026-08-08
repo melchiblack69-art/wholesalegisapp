@@ -2,6 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip, useMap }
 import { useEffect } from "react";
 import L from "leaflet";
 import { Link } from "react-router-dom";
+import { formatDistance } from "../utils/distance";
 
 const NIA_CENTER = [5.5715, -0.2298];
 
@@ -105,10 +106,10 @@ export default function CompanyMap({
                   <div className="fw-semibold">{c.name}</div>
                   <div style={{ color: cat.color, fontSize: "0.8rem" }}>{cat.name}</div>
                   <div className="text-muted-brand" style={{ fontSize: "0.78rem" }}>
-                    {c.distanceKm} km away
+                    {formatDistance(c.distanceKm)} away
                   </div>
                   {linkToDetail && (
-                    <Link to={`/companies/${c.id}`} className="fw-semibold text-primary-brand d-inline-block mt-1" style={{ fontSize: "0.82rem" }}>
+                    <Link to={`/companies/${c.public_id || c.id}`} className="fw-semibold text-primary-brand d-inline-block mt-1" style={{ fontSize: "0.82rem" }}>
                       View Details
                     </Link>
                   )}

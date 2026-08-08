@@ -2,6 +2,7 @@ const db = require("../config/db");
 const bcrypt = require("bcryptjs");
 
 const generateToken = require("../config/jwt");
+const { newPublicId, resolveInternalId } = require("../utils/publicId");
 
 const {
   uploadToCloudinary,
@@ -63,10 +64,11 @@ exports.register = async (req, res) => {
 
     await db.query(
       `INSERT INTO users
-       (company_id, name, username, phone, 
+       (public_id, company_id, name, username, phone, 
         email, role, password, photo)
-       VALUES (?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?)`,
       [
+        newPublicId(),
         req.auth.company_id,
         name,
         username,
@@ -96,7 +98,7 @@ exports.login = async (req, res) => {
     }
     // ── 1. Check Admin ──────────────────────────────────────────
     const [rows] = await db.query(
-      `SELECT id,company_id, name, email, username, phone, password, role, photo FROM users
+      `SELECT id,public_id,company_id, name, email, username, phone, password, role, photo FROM users
 WHERE email = ? OR username = ? OR phone = ?
 LIMIT 1`,
       [email, email, email],
@@ -108,6 +110,15 @@ LIMIT 1`,
     const admin = rows[0];
     const match = await bcrypt.compare(password, admin.password);
     if (!match) return res.status(401).json({ message: "Invalid credentials" });
+
+    // Only super administrators may exist without an assigned company.
+    // Company-scoped admin accounts must be linked to a company before login.
+    if (admin.role !== "super_admin" && !admin.company_id) {
+      return res.status(403).json({
+        message: "This account is not assigned to a company.",
+      });
+    }
+
     await db.query("UPDATE users SET last_login = NOW() WHERE id = ?", [
       admin.id,
     ]);
@@ -122,6 +133,7 @@ LIMIT 1`,
       token,
       admin: {
         id: admin.id,
+        public_id: admin.public_id,
         fullName: admin.name,
         email: admin.email,
         role: admin.role,
@@ -186,8 +198,8 @@ exports.changePassword = async (req, res) => {
    Route: PUT /api/auth/update/:id  (upload.single('photo') middleware)       */
 exports.updateUser = async (req, res) => {
   try {
-    const userId = req.params?.id;
-    if (String(req.auth?.id) !== String(userId))
+    const userId = await resolveInternalId(db, "users", req.params?.id);
+    if (!userId || String(req.auth?.id) !== String(userId))
       return res
         .status(403)
         .json({ message: "You can only update your own profile" });
@@ -256,7 +268,8 @@ exports.updateUser = async (req, res) => {
    Expects: upload.single('photo') middleware on the route               */
 exports.uploadAdminPhoto = async (req, res) => {
   try {
-    const userId = req.params?.id;
+    const userId = await resolveInternalId(db, "users", req.params?.id);
+    if (!userId) return res.status(404).json({ message: "Admin not found" });
     if (!req.file)
       return res.status(400).json({ message: "No image provided" });
 
@@ -308,8 +321,8 @@ exports.uploadAdminPhoto = async (req, res) => {
    DELETE /api/auth/admins/:id/photo                                      */
 exports.deleteAdminPhoto = async (req, res) => {
   try {
-    const userId = req.params?.id;
-    if (String(req.auth?.id) !== String(userId))
+    const userId = await resolveInternalId(db, "users", req.params?.id);
+    if (!userId || String(req.auth?.id) !== String(userId))
       return res
         .status(403)
         .json({ message: "You can only remove your own photo" });
@@ -382,11 +395,13 @@ exports.deleteCompanyUser = async (req, res) => {
 /* ================= GET ADMIN BY ID (COMPANY) ======================================= */
 exports.getAdminDetails = async (req, res) => {
   try {
+    const userId = await resolveInternalId(db, "users", req.params.id);
+    if (!userId) return res.status(404).json({ message: "Admin not found" });
     const [rows] = await db.query(
       `SELECT id, company_id, name,username, phone,
               email, role, photo, created_at
        FROM users WHERE id = ?`,
-      [req.params.id],
+      [userId],
     );
     if (!rows.length)
       return res.status(404).json({ message: "Admin not found" });
@@ -419,9 +434,9 @@ exports.getAllCompanies = async (req, res) => {
     if (!admin_role) return res.status(403).json({ message: "Super admin access required" });
 
     const [rows] = await db.query(
-      `SELECT c.id, c.company_name, c.phone,
+      `SELECT c.id, c.public_id, c.company_name, c.phone,
               c.email, c.address, c.latitude, c.longitude,c.working_hours, c.description, c.status, c.created_at,
-              g.category_name AS category_name, g.id AS cat_id, g.color AS category_color, g.icon,
+              g.category_name AS category_name, g.id AS cat_id, g.public_id AS category_public_id, g.color AS category_color, g.icon,
               (
                 SELECT COUNT(*) FROM products
                 WHERE company_id = c.id
@@ -441,7 +456,7 @@ exports.getAllCompanies = async (req, res) => {
 exports.getMyCompanyDetails = async (req, res) => {
   try {
     const admin_id = req.auth?.id;
-    const company_id = req.params.company_id;
+    const company_id = await resolveInternalId(db, "companies", req.params.company_id);
     const userRole = req.auth?.role;
     const userCompanyId = req.auth?.company_id;
 
@@ -468,7 +483,7 @@ exports.getMyCompanyDetails = async (req, res) => {
     const [company] = await db.query(
       `
       SELECT
-        c.id,
+        c.id, c.public_id,
         c.company_name,
         c.phone,
         c.email,
@@ -479,7 +494,7 @@ exports.getMyCompanyDetails = async (req, res) => {
         c.description,
         c.status,
         c.created_at,
-        g.id AS cat_id,
+        g.id AS cat_id, g.public_id AS category_public_id,
         g.category_name, g.color AS category_color
       FROM companies c
       LEFT JOIN categories g
@@ -496,7 +511,7 @@ exports.getMyCompanyDetails = async (req, res) => {
     const [products] = await db.query(
       `
       SELECT
-        id,
+        id, public_id,
         product_name
       FROM products
       WHERE company_id = ?

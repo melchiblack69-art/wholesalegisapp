@@ -4,6 +4,7 @@ import StatusBadge from "../components/StatusBadge";
 import TableToolbar from "../components/TableToolbar";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 import { useModal } from "../context/ModalContext";
 //import { iconOptions } from "../data/icons";
 const iconOptions = ["bi-house-door-fill", "bi-lightning-charge-fill",
@@ -14,6 +15,7 @@ const iconOptions = ["bi-house-door-fill", "bi-lightning-charge-fill",
 function normalizeCategory(item) {
   return {
     id: item.id,
+    public_id: item.public_id,
     name: item.category_name || item.name || "",
     icon: item.icon || iconOptions[0],
     slug: (item.category_name || item.name || "").toLowerCase().replace(/\s+/g, "-"),
@@ -71,7 +73,7 @@ export default function Categories() {
 
     try {
       if (editing) {
-        const updated = await api.put(`/api/company/categories/${editing.id}`, {
+        const updated = await api.put(`/api/company/categories/${publicId(editing)}`, {
           category_name: form.name,
           category_icon: form.icon,
           category_color: form.color,
@@ -96,7 +98,7 @@ export default function Categories() {
 
   const remove = async (id) => {
     try {
-      await api.del(`/api/company/categories/${id}`);
+      await api.del(`/api/company/categories/${publicId(categories.find((c) => c.id === id)) || id}`);
       setCategories((prev) => prev.filter((c) => c.id !== id));
       setConfirmDeleteId(null);
     } catch (error) {

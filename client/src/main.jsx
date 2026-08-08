@@ -10,10 +10,29 @@ import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { FavoritesProvider } from "./context/FavoritesContext.jsx";
 import { SystemSettingsProvider } from "./context/SystemSettingsContext.jsx";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import { get, set, del } from "idb-keyval";
+
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 2, refetchOnWindowFocus: false, networkMode: "online" } } });
+const queryPersister = createAsyncStoragePersister({
+  storage: { getItem: get, setItem: set, removeItem: del },
+  key: "wholesale-locator-query-cache",
+});
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: queryPersister,
+        maxAge: 10 * 60 * 1000,
+        buster: "public-cache-v1",
+      }}
+    >
+      <BrowserRouter>
       <SystemSettingsProvider>
         <AuthProvider>
           <FavoritesProvider>
@@ -21,6 +40,8 @@ createRoot(document.getElementById("root")).render(
           </FavoritesProvider>
         </AuthProvider>
       </SystemSettingsProvider>
-    </BrowserRouter>
+      </BrowserRouter>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+    </PersistQueryClientProvider>
   </StrictMode>
 );

@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import CompanyCard from "../components/CompanyCard";
-import { useEffect, useState } from "react";
-import { api } from "../api/client";
+import { useCompanies } from "../api/queries";
 import { useFavorites } from "../context/FavoritesContext";
 import { companyImageUrl } from "../utils/image";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { formatDistance } from "../utils/distance";
 
 export default function Favorites() {
   const { favorites, toggleFavorite } = useFavorites();
-  const [companies, setCompanies] = useState([]);
-  useEffect(() => { api.get("/api/user/companies").then((rows) => setCompanies(Array.isArray(rows) ? rows : [])).catch(() => {}); }, []);
+  const { data: companies = [], isLoading } = useCompanies();
   const favCompanies = companies.filter((c) => favorites.includes(c.id));
 
   return (
@@ -22,7 +22,7 @@ export default function Favorites() {
           <p className="text-muted-brand mb-0">Your saved wholesale companies</p>
         </div>
 
-        {favCompanies.length === 0 ? (
+        {isLoading ? <LoadingSpinner /> : favCompanies.length === 0 ? (
           <div className="text-center py-5">
             <i className="bi bi-heart text-secondary" style={{ fontSize: "2.5rem" }} />
             <p className="text-muted-brand mt-3 mb-0">No favorites yet.</p>
@@ -55,7 +55,7 @@ export default function Favorites() {
                     return (
                       <tr key={c.id}>
                         <td>
-                          <Link to={`/companies/${c.id}`} className="d-flex align-items-center gap-2 text-decoration-none text-dark">
+                          <Link to={`/companies/${c.public_id || c.id}`} className="d-flex align-items-center gap-2 text-decoration-none text-dark">
                             <img
                               src={companyImageUrl(c, 100, 100)}
                               loading="lazy"
@@ -68,7 +68,7 @@ export default function Favorites() {
                         </td>
                         <td style={{ color: cat.color, fontSize: "0.88rem" }}>{cat.name}</td>
                         <td className="text-muted-brand" style={{ fontSize: "0.88rem" }}>{c.address}</td>
-                        <td className="text-muted-brand" style={{ fontSize: "0.88rem" }}>{c.distanceKm} km</td>
+                        <td className="text-muted-brand" style={{ fontSize: "0.88rem" }}>{formatDistance(c.distanceKm)}</td>
                         <td>
                           <button
                             className="btn btn-sm border-0 text-danger"

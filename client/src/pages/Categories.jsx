@@ -1,13 +1,10 @@
 import MobileHeader from "../components/MobileHeader";
 import CategoryCard from "../components/CategoryCard";
-import { useState, useEffect } from "react";
-import { api } from "../api/client";
+import { useCategories } from "../api/queries";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 export default function Categories() {
-  const [categories, setCategories] = useState([]);
-  useEffect(() => {
-    api.get("/api/user/categories").then((rows) => setCategories(Array.isArray(rows) ? rows : [])).catch(() => {});
-  }, []);
+  const { data: categories = [], isLoading, isError } = useCategories();
 
   return (
     <>
@@ -18,13 +15,14 @@ export default function Categories() {
         </h1>
         <p className="text-muted-brand d-none d-lg-block mb-4">Browse companies by category</p>
 
-        <div className="row g-3">
+        {isError && <p className="text-danger">Unable to load categories. Please try again.</p>}
+        {isLoading ? <LoadingSpinner /> : <div className="row g-3">
           {categories.map((c) => (
             <div className="col-6 col-lg-4" key={c.id}>
               <CategoryCard category={c} variant="full" />
             </div>
           ))}
-        </div>
+        </div>}
       </div>
     </>
   );

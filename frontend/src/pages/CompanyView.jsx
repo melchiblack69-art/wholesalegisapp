@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import AdminMap from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 
 function formatTimeToAmPm(value) {
   if (!value) return "--";
@@ -95,7 +96,7 @@ export default function CompanyView() {
         subtitle="Company details"
         onMenuClick={openSidebar}
         actions={
-          <button className="btn btn-brand rounded-3 px-3" onClick={() => navigate(`/company/${company.id}/edit`)}>
+          <button className="btn btn-brand rounded-3 px-3" onClick={() => navigate(`/company/${publicId(company)}/edit`)}>
             <i className="bi bi-pencil me-2" /> Edit
           </button>
         }

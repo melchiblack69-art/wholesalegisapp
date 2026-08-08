@@ -121,6 +121,13 @@ async function delPattern(pattern) {
 
 // ── Cache key constants ───────────────────────────────────────────────────────
 const KEYS = {
+  publicCompanies: 'public:companies',
+  publicCompany: (id) => `public:company:${id}`,
+  publicProducts: (id) => `public:company:${id}:products`,
+  publicCategories: 'public:categories',
+  publicStats: 'public:stats',
+  publicMap: 'public:map',
+  publicCategoryCompanies: (id) => `public:category:${id}:companies`,
   // Company
   company: (id) => `company:${id}`,
 
@@ -134,6 +141,13 @@ const KEYS = {
 
 // TTLs in seconds
 const TTL = {
+  publicCompanies: 3 * 60,
+  publicCompany: 5 * 60,
+  publicProducts: 10 * 60,
+  publicCategories: 15 * 60,
+  publicStats: 5 * 60,
+  publicMap: 3 * 60,
+  publicCategoryCompanies: 3 * 60,
   companyImages:  20  * 60,   // 20 minutes
   company:      5  * 60,   // 5 minutes
   dashboard: 2  * 60,   // 2 minutes

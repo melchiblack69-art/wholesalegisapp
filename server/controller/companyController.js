@@ -1,4 +1,12 @@
 const db           = require("../config/db");
+const { newPublicId, resolveInternalId } = require("../utils/publicId");
+const redis = require("../config/RedisClient");
+
+const invalidatePublicCatalog = () => Promise.all([
+  redis.del(redis.KEYS.publicCompanies, redis.KEYS.publicCategories, redis.KEYS.publicStats, redis.KEYS.publicMap),
+  redis.delPattern("public:company:*") ,
+  redis.delPattern("public:category:*:companies"),
+]);
 
 //========== CATEGORY MANAGEMENT ENDPOINTS (add, update, delete) ============================
 //add a new category
@@ -21,16 +29,18 @@ exports.addCategory = async (req, res) => {
       return res.status(400).json({ message: "Category already exists" });
     }
 
+    const categoryPublicId = newPublicId();
     const [result] = await db.query(
-      "INSERT INTO categories (category_name, icon, color) VALUES (?, ?, ?)",
-      [categoryName, categoryIcon, categoryColor]
+      "INSERT INTO categories (public_id, category_name, icon, color) VALUES (?, ?, ?, ?)",
+      [categoryPublicId, categoryName, categoryIcon, categoryColor]
     );
 
     res.status(201).json({
       message: "Category added successfully",
       id: result.insertId,
-      category: { id: result.insertId, category_name: categoryName, icon: categoryIcon, color: categoryColor }
+      category: { id: result.insertId, public_id: categoryPublicId, category_name: categoryName, icon: categoryIcon, color: categoryColor }
     });
+    await invalidatePublicCatalog();
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -41,13 +51,15 @@ exports.addCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const categoryId = await resolveInternalId(db, "categories", id);
+    if (!categoryId) return res.status(404).json({ message: "Category not found" });
     const categoryName = req.body.category_name ?? req.body.name;
     const categoryIcon = req.body.category_icon ?? req.body.icon;
     const categoryColor = req.body.category_color ?? req.body.color ?? "#1c6b41";
 
     const [result] = await db.query(
       "UPDATE categories SET category_name=?, icon=?, color=? WHERE id=?",
-      [categoryName, categoryIcon, categoryColor, id]
+      [categoryName, categoryIcon, categoryColor, categoryId]
     );
 
     if (!result.affectedRows) {
@@ -58,6 +70,7 @@ exports.updateCategory = async (req, res) => {
       message: "Category updated successfully",
       category: { id, category_name: categoryName, icon: categoryIcon, color: categoryColor }
     });
+    await invalidatePublicCatalog();
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -68,10 +81,12 @@ exports.updateCategory = async (req, res) => {
 exports.deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const categoryId = await resolveInternalId(db, "categories", id);
+    if (!categoryId) return res.status(404).json({ message: "Category not found" });
 
     const [result] = await db.query(
       "DELETE FROM categories WHERE id=?",
-      [id]
+      [categoryId]
     );
 
     if (!result.affectedRows) {
@@ -79,6 +94,7 @@ exports.deleteCategory = async (req, res) => {
     }
 
     res.json({ message: "Category deleted successfully" });
+    await invalidatePublicCatalog();
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -90,7 +106,7 @@ exports.getCategories = async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT
-        c.id,
+        c.id, c.public_id,
         c.category_name,
         c.icon,
         c.color,
@@ -104,6 +120,7 @@ exports.getCategories = async (req, res) => {
     const categories = rows.map((row) => {
       return {
         id: row.id,
+        public_id: row.public_id,
         category_name: row.category_name,
         icon: row.icon || "bi-grid-fill",
         color: row.color || "#1c6b41",
@@ -137,9 +154,10 @@ exports.addCompany = async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO companies
-      (company_name, phone, email, address, latitude, longitude, description, working_hours, category_id)
-      VALUES (?,?,?,?,?,?,?,?,?)`,
+      (public_id, company_name, phone, email, address, latitude, longitude, description, working_hours, category_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [
+        newPublicId(),
         company_name,
         phone,
         email,
@@ -148,7 +166,7 @@ exports.addCompany = async (req, res) => {
         longitude,
         description,
         working_hours || null,
-        category_id ?? null
+        category_id ? await resolveInternalId(db, "categories", category_id) : null
       ]
     );
 
@@ -156,6 +174,7 @@ exports.addCompany = async (req, res) => {
       message: "Company added successfully",
       id: result.insertId
     });
+    await invalidatePublicCatalog();
 
   } catch (err) {
     console.error(err);
@@ -166,6 +185,9 @@ exports.addCompany = async (req, res) => {
 exports.updateCompany = async (req, res) => {
   try {
     const { id } = req.params;
+    const companyId = await resolveInternalId(db, "companies", id);
+    if (!companyId) return res.status(404).json({ message: "Company not found" });
+    const categoryId = category_id ? await resolveInternalId(db, "categories", category_id) : null;
 
     const {
       company_name,
@@ -204,8 +226,8 @@ exports.updateCompany = async (req, res) => {
         description,
         working_hours ?? null,
         status,
-        category_id ?? null,
-        id
+        categoryId,
+        companyId
       ]
     );
 
@@ -214,6 +236,7 @@ exports.updateCompany = async (req, res) => {
     }
 
     res.json({ message: "Company updated successfully" });
+    await invalidatePublicCatalog();
 
   } catch (err) {
     console.error(err);
@@ -228,7 +251,7 @@ exports.deleteCompany = async (req, res) => {
 
     const [result] = await db.query(
       "DELETE FROM companies WHERE id=?",
-      [id]
+      [companyId]
     );
 
     if (!result.affectedRows) {
@@ -236,6 +259,7 @@ exports.deleteCompany = async (req, res) => {
     }
 
     res.json({ message: "Company deleted successfully" });
+    await invalidatePublicCatalog();
 
   } catch (err) {
     console.error(err);
@@ -248,16 +272,19 @@ exports.deleteCompany = async (req, res) => {
 exports.addProduct = async (req, res) => {
   try {
     const { company_id, product_name, quantity = 0, unit = "" } = req.body;
+    const companyId = await resolveInternalId(db, "companies", company_id);
+    if (!companyId) return res.status(404).json({ message: "Company not found" });
 
     const [result] = await db.query(
-      "INSERT INTO products (company_id, product_name, quantity, unit) VALUES (?,?,?,?)",
-      [company_id, product_name, quantity, unit]
+      "INSERT INTO products (public_id, company_id, product_name, quantity, unit) VALUES (?,?,?,?,?)",
+      [newPublicId(), companyId, product_name, quantity, unit]
     );
 
     res.status(201).json({
       message: "Product added successfully",
       id: result.insertId
     });
+    await invalidatePublicCatalog();
 
   } catch (err) {
     console.error(err);
@@ -270,12 +297,15 @@ exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const { company_id, product_name, quantity = 0 , unit = ""} = req.body;
+    const productId = await resolveInternalId(db, "products", id);
+    const companyId = await resolveInternalId(db, "companies", company_id);
+    if (!productId || !companyId) return res.status(404).json({ message: "Product or company not found" });
 
     const [result] = await db.query(
       `UPDATE products
       SET company_id=?, product_name=?, quantity=?, unit=?
       WHERE id=?`,
-      [company_id, product_name, quantity, unit, id]
+      [companyId, product_name, quantity, unit, productId]
     );
 
     if (!result.affectedRows) {
@@ -283,6 +313,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     res.json({ message: "Product updated successfully" });
+    await invalidatePublicCatalog();
 
   } catch (err) {
     console.error(err);
@@ -292,9 +323,11 @@ exports.updateProduct = async (req, res) => {
 //get all products for a company
 exports.getProducts = async (req, res) => {
   try {
-    const company_id = req.params?.company_id;
+    const company_id = await resolveInternalId(db, "companies", req.params?.company_id);
+    if (!company_id) return res.status(404).json({ message: "Company not found" });
     const [rows] = await db.query(`
-      SELECT * FROM products 
+      SELECT p.*, p.public_id
+      FROM products p
       WHERE company_id = ?
       `, [company_id]);
     res.json(rows);
@@ -311,7 +344,7 @@ exports.deleteProduct = async (req, res) => {
 
     const [result] = await db.query(
       "DELETE FROM products WHERE id=?",
-      [id]
+      [await resolveInternalId(db, "products", id)]
     );
 
     if (!result.affectedRows) {
@@ -319,6 +352,7 @@ exports.deleteProduct = async (req, res) => {
     }
 
     res.json({ message: "Product deleted successfully" });
+    await invalidatePublicCatalog();
 
   } catch (err) {
     console.error(err);

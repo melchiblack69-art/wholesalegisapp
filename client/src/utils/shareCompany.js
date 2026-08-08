@@ -1,5 +1,5 @@
 export async function shareCompany(company) {
-  const url = `${window.location.origin}/companies/${company.id}`;
+  const url = `${window.location.origin}/companies/${company.public_id || company.id}`;
 
   const shareData = {
     title: company.company_name,

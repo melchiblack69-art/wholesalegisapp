@@ -5,7 +5,9 @@ import SearchBar from "../components/SearchBar";
 import CompanyCard from "../components/CompanyCard";
 import CompanyMap from "../components/CompanyMap";
 import { api } from "../api/client";
+import { loggedQuery, useCategories, useCompanies, useLoggedQuery } from "../api/queries";
 import { haversineDistance } from "../utils/haversine";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const PAGE_SIZE = 5;
 
@@ -15,33 +17,26 @@ export default function SearchResults() {
   const [search, setSearch] = useState(q);
   const categorySlug = params.get("category") || "";
   const [visible, setVisible] = useState(PAGE_SIZE);
-  const [companies, setCompanies] = useState([]);
+  const { data: allCompanies = [], isLoading: companiesLoading } = useCompanies();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const category = categories.find((item) => item.category_name?.toLowerCase().trim().replace(/\s+/g, "-") === categorySlug);
+  const categoryIdentifier = category?.public_id;
+  const categoryQueryKey = ["companies-by-category", categoryIdentifier];
+  const { data: categoryCompanies = [], isLoading: categoryCompaniesLoading } = useLoggedQuery("companies-by-category", { queryKey: categoryQueryKey, queryFn: loggedQuery("companies-by-category", categoryQueryKey, () => api.get(`/api/user/category/${categoryIdentifier}`)), enabled: Boolean(categoryIdentifier), staleTime: 2 * 60 * 1000, select: (rows) => Array.isArray(rows) ? rows.map((c) => ({ ...c, name: c.company_name })) : [] });
   const [position, setPosition] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(true);
 
   useEffect(() => {
-    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
-      ({ coords }) => setPosition({ lat: coords.latitude, lng: coords.longitude }),
-      () => setPosition(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    if (!navigator.geolocation) { setLocationLoading(false); return; }
+    const timeout = window.setTimeout(() => setLocationLoading(false), 12000);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => { setPosition({ lat: coords.latitude, lng: coords.longitude }); setLocationLoading(false); },
+      () => { setPosition(null); setLocationLoading(false); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-    const load = async () => {
-      try {
-        if (categorySlug) {
-          const categories = await api.get("/api/user/categories");
-          const category = (Array.isArray(categories) ? categories : []).find((item) =>
-            item.category_name?.toLowerCase().trim().replace(/\s+/g, "-") === categorySlug
-          );
-          if (category) {
-            const rows = await api.get(`/api/user/category/${category.id}`);
-            setCompanies(Array.isArray(rows) ? rows.map((c) => ({ ...c, name: c.company_name })) : []);
-            return;
-          }
-        }
-        const rows = await api.get("/api/user/companies");
-        setCompanies(Array.isArray(rows) ? rows.map((c) => ({ ...c, name: c.name || c.company_name })) : []);
-      } catch { setCompanies([]); }
-    };
-    load();
-  }, [categorySlug]);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  const companies = category ? categoryCompanies : allCompanies;
 
   const filtered = useMemo(() => {
     return companies
@@ -77,8 +72,10 @@ export default function SearchResults() {
               {filtered.length} {filtered.length === 1 ? "Company" : "Companies"} Found
             </p>
 
-            <div className="d-flex flex-column gap-2" style={{ maxHeight: "72vh", overflowY: "auto" }}>
-              {results.length === 0 && (
+            <div className="position-relative d-flex flex-column gap-2" style={{ minHeight: 180, maxHeight: "72vh", overflowY: "auto" }}>
+              {categoriesLoading || companiesLoading || categoryCompaniesLoading || locationLoading ? (
+                <LoadingSpinner overlay />
+              ) : results.length === 0 && (
                 <div className="text-center text-muted-brand py-5">
                   No companies match your search. Try a different keyword.
                 </div>

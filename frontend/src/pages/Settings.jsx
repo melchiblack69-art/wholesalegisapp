@@ -4,6 +4,7 @@ import Avatar from "../components/Avatar";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 import { useModal } from "../context/ModalContext";
 import { useSystemSettings } from "../context/SystemSettingsContext";
 import LoaderSpinner from "../components/LoadingSpinner";
@@ -549,7 +550,7 @@ export default function Settings() {
       formData.append("phone", profile.phone);
       if (selectedPhoto) formData.append("photo", selectedPhoto);
 
-      const data = await api.put(`/api/auth/update/${user.id}`, formData, {
+      const data = await api.put(`/api/auth/update/${publicId(user)}`, formData, {
         isForm: true,
       });
       updateCurrentUser(data.admin);
@@ -581,7 +582,7 @@ export default function Settings() {
 
     setIsRemovingPhoto(true);
     try {
-      const data = await api.del(`/api/auth/admins/${user.id}/photo`);
+      const data = await api.del(`/api/auth/admins/${publicId(user)}/photo`);
       updateCurrentUser(data.admin);
       setProfileUser(data.admin);
       showModal("Profile photo removed.", {
@@ -639,7 +640,7 @@ export default function Settings() {
     try {
       setSaving(true);
 
-      await api.put(`/api/auth/change-password/${user.id}`, {
+      await api.put(`/api/auth/change-password/${publicId(user)}`, {
         currentPassword: pwd.current,
         newPassword: pwd.next,
       });

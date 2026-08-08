@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 import { useNavigate } from "react-router-dom";
 
+const publicId = (entity) => entity?.public_id || entity?.id;
+
 /**
  * Profile display + editor for the user-facing app.
  * - "Edit Profile" toggles inputs in place (Save / Cancel).
@@ -38,6 +40,12 @@ export default function ProfileDisplay({
   const onLogout = providedLogout || logout;
   const fileInputRef = useRef(null);
 
+  useEffect(() => {
+    if (!providedUser && !authUser) {
+      navigate("/", { replace: true });
+    }
+  }, [authUser, providedUser, navigate]);
+
   const [activeTab, setActiveTab] = useState("profile"); // "profile" | "password"
 
   // ---- Profile edit state ----
@@ -53,9 +61,13 @@ export default function ProfileDisplay({
   }, [user.id, user.name, user.email, user.phone]);
 
   // ---- Avatar state ----
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
+  const [avatarUrl, setAvatarUrl] = useState(user.photo || user.avatarUrl || "");
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setAvatarUrl(user.photo || user.avatarUrl || "");
+    setImgError(false);
+  }, [user.photo, user.avatarUrl]);
   const [feedback, setFeedback] = useState({
     type: "",
     text: "",
@@ -111,7 +123,7 @@ export default function ProfileDisplay({
     try {
       const result = onSaveProfile
         ? await onSaveProfile(form)
-        : await api.put(`/api/user/update/${user.id}`, form);
+        : await api.put(`/api/user/update/${publicId(user)}`, form);
       if (result?.user) updateCurrentUser(result.user);
       setEditMode(false);
       return setFeedback({
@@ -137,7 +149,7 @@ export default function ProfileDisplay({
       data.append("photo", file);
       const result = onAvatarChange
         ? await onAvatarChange(file)
-        : await api.put(`/api/user/${user.id}/photo`, data, { isForm: true });
+        : await api.put(`/api/user/${publicId(user)}/photo`, data, { isForm: true });
       if (result?.user) { updateCurrentUser(result.user); setAvatarUrl(result.user.photo || localPreview); }
     } finally {
       setAvatarBusy(false);
@@ -148,7 +160,7 @@ export default function ProfileDisplay({
   const handleDeletePhoto = async () => {
     setAvatarBusy(true);
     try {
-      const result = onDeletePhoto ? await onDeletePhoto() : await api.del(`/api/user/${user.id}/photo`);
+    const result = onDeletePhoto ? await onDeletePhoto() : await api.del(`/api/user/${publicId(user)}/photo`);
       if (result?.user) updateCurrentUser(result.user);
       setAvatarUrl("");
     } finally {
@@ -193,7 +205,7 @@ export default function ProfileDisplay({
     setDeleting(true);
     try {
       if (onDeleteAccount) await onDeleteAccount();
-      else await api.del(`/api/user/delete-account/${user.id}`);
+      else await api.del(`/api/user/delete-account/${publicId(user)}`);
       setDeleteOpen(false);
       logout();
      setTimeout(()=>{ navigate("/")}, 900);

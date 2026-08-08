@@ -1,33 +1,32 @@
-import { useState,useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import SearchBar from "../components/SearchBar";
 import CategoryCard from "../components/CategoryCard";
 import CompanyCard from "../components/CompanyCard";
 import MobileMenuDrawer from "../components/MobileMenuDrawer";
-import { api } from "../api/client";
+import { useCategories, useCompanies, useStats } from "../api/queries";
 import { haversineDistance } from "../utils/haversine";
 
 
 export default function Home() {
-  const [categories, setCategories] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [stats, setStats] = useState([]);
+  const { data: categories = [] } = useCategories();
+  const { data: companyRows = [] } = useCompanies();
+  const { data: statsData } = useStats();
   const [position, setPosition] = useState(null);
 
   useEffect(() => {
-    api.get("/api/user/categories").then((rows) => setCategories(Array.isArray(rows) ? rows : [])).catch(() => {});
-    api.get("/api/user/companies").then((rows) => setCompanies(Array.isArray(rows) ? rows.map((c) => ({ ...c, name: c.name || c.company_name })) : [])).catch(() => {});
-    api.get("/api/user/stats").then((data) => setStats([
-      { icon: "bi-geo-alt-fill", value: `${data?.total_companies || 0}`, label: "Wholesale Companies" },
-      { icon: "bi-grid-fill", value: `${data?.total_categories || 0}`, label: "Categories" },
-      { icon: "bi-box-seam-fill", value: `${data?.total_products || 0}`, label: "Products" },
-    ])).catch(() => {});
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
       ({ coords }) => setPosition({ lat: coords.latitude, lng: coords.longitude }),
       () => setPosition(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   }, []);
+  const companies = companyRows;
+  const stats = [
+    { icon: "bi-geo-alt-fill", value: `${statsData?.total_companies || 0}`, label: "Wholesale Companies" },
+    { icon: "bi-grid-fill", value: `${statsData?.total_categories || 0}`, label: "Categories" },
+    { icon: "bi-box-seam-fill", value: `${statsData?.total_products || 0}`, label: "Products" },
+  ];
   
   const [menuOpen, setMenuOpen] = useState(false);
   const nearest = [...companies]

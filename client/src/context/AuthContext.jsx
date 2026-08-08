@@ -9,6 +9,7 @@ function normalizeUser(payload) {
 
   return {
     id: source.id,
+    public_id: source.public_id ?? null,
     name: source.name ?? source.fullName ?? source.username ?? "",
     username: source.username ?? "",
     email: source.email ?? "",
