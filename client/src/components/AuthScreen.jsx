@@ -65,7 +65,7 @@ export default function AuthScreen({ isModal = false, onClose }) {
 
     if (!/^\+?[0-9]{9,15}$/.test(phone))
       return setErr("Enter a valid phone number.");
-
+if(password.length < 4) return setErr("Password must be at least 4");
     setLoading(true); setErr("");
     try {
       await register({ name, email, phone, password });

@@ -92,7 +92,6 @@ export default function Contact() {
             <div className="fw-medium">{feedback.text}</div>
           </div>
         )}
-        <button onClick={() => navigate("/profile")}>PROFILE</button>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">

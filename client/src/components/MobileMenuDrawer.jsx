@@ -56,7 +56,7 @@ export default function MobileMenuDrawer({ open, onClose }) {
             <span className="icon-circle bg-primary-brand text-white" style={{ width: 34, height: 34 }}>
               {user?.photo ? <img src={user.photo} alt="User" className="profile-nav-photo" /> : <i className="bi bi-person" />}
             </span>
-            <span className="fw-bold" style={{ fontSize: "0.6rem" }}>
+            <span className="fw-bold" style={{ fontSize: "0.8rem" }}>
               {user ? user.name || user.email : "Guest"}
             </span>
           </div>

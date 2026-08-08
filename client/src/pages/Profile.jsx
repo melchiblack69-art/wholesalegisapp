@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import MobileHeader from "../components/MobileHeader";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
+import { useNavigate } from "react-router-dom";
 
 /**
  * Profile display + editor for the user-facing app.
@@ -24,6 +25,7 @@ export default function ProfileDisplay({
   onDeleteAccount = null,
 }) {
   const { user: authUser, updateCurrentUser, logout } = useAuth();
+  const navigate = useNavigate();
   const user = providedUser || authUser || {
     name: "Kwame Mensah",
     email: "kwame.mensah@example.com",
@@ -45,17 +47,19 @@ export default function ProfileDisplay({
     name: user.name,
     email: user.email,
     phone: user.phone,
-    location: user.location,
   });
   useEffect(() => {
-    setForm({ name: user.name || "", email: user.email || "", phone: user.phone || "", location: user.location || "" });
-  }, [user.id, user.name, user.email, user.phone, user.location]);
+    setForm({ name: user.name || "", email: user.email || "", phone: user.phone || "" });
+  }, [user.id, user.name, user.email, user.phone]);
 
   // ---- Avatar state ----
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [imgError, setImgError] = useState(false);
-
+  const [feedback, setFeedback] = useState({
+    type: "",
+    text: "",
+  });
   // ---- Password tab state ----
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
@@ -74,18 +78,35 @@ export default function ProfileDisplay({
 
   // ---------- Profile edit handlers ----------
   const startEdit = () => {
-    setForm({ name: user.name, email: user.email, phone: user.phone, location: user.location });
+    setForm({ name: user.name, email: user.email, phone: user.phone });
     setEditMode(true);
   };
 
   const cancelEdit = () => {
-    setForm({ name: user.name, email: user.email, phone: user.phone, location: user.location });
+    setForm({ name: user.name, email: user.email, phone: user.phone });
     setEditMode(false);
   };
+
+  useEffect(() => {
+    if (!feedback.text && !pwError && !pwSuccess) return;
+    
+    const timer = setTimeout(() => {
+      setFeedback({ type: "", text: "" });
+      setPwError("");
+      setPwSuccess("");
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [feedback, pwError, pwSuccess]);
 
   const saveEdit = async (e) => {
     e.preventDefault();
     if (!editMode) return;
+    if(!/^\+?[0-9]{9,15}$/.test(form.phone)){
+      return setFeedback({
+        type: "error", 
+        text: "Enter a valid phone number."});
+    }
     setSaving(true);
     try {
       const result = onSaveProfile
@@ -93,6 +114,9 @@ export default function ProfileDisplay({
         : await api.put(`/api/user/update/${user.id}`, form);
       if (result?.user) updateCurrentUser(result.user);
       setEditMode(false);
+      return setFeedback({
+        type: "success", 
+        text: "Profile updated."});
     } finally {
       setSaving(false);
     }
@@ -144,8 +168,8 @@ export default function ProfileDisplay({
       setPwError("Please fill in all password fields.");
       return;
     }
-    if (pwForm.next.length < 6) {
-      setPwError("New password must be at least 6 characters.");
+    if (pwForm.next.length < 4) {
+      setPwError("New password must be at least 4 characters.");
       return;
     }
     if (pwForm.next !== pwForm.confirm) {
@@ -172,6 +196,7 @@ export default function ProfileDisplay({
       else await api.del(`/api/user/delete-account/${user.id}`);
       setDeleteOpen(false);
       logout();
+     setTimeout(()=>{ navigate("/")}, 900);
     }
     finally { setDeleting(false); }
   };
@@ -280,7 +305,26 @@ export default function ProfileDisplay({
             Change Password
           </button>
         </div>
+        {/* Feedback */}
+        {feedback.text && (
+          <div
+            className={`d-flex align-items-center gap-2 px-2 py-2 rounded-3 shadow-sm border mb-4 ${
+              feedback.type === "success"
+                ? "bg-success-subtle border-success text-success"
+                : "bg-danger-subtle border-danger text-danger"
+            }`}
+          >
+            <i
+              className={`bi ${
+                feedback.type === "success"
+                  ? "bi-check-circle-fill"
+                  : "bi-exclamation-circle-fill"
+              } fs-5`}
+            />
 
+            <div className="fw-medium">{feedback.text}</div>
+          </div>
+        )}
         {/* ---------------- Profile Information tab ---------------- */}
         {activeTab === "profile" && (
           <form onSubmit={saveEdit}>
@@ -307,13 +351,7 @@ export default function ProfileDisplay({
                 value={form.phone}
                 onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
               />
-              <ProfileField
-                icon="bi-geo-alt"
-                label="Location"
-                editMode={editMode}
-                value={form.location}
-                onChange={(v) => setForm((f) => ({ ...f, location: v }))}
-              />
+              
             </div>
 
             {/* Actions: Edit vs Save/Cancel */}
