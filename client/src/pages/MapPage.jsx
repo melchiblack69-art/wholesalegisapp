@@ -18,39 +18,8 @@ export default function MapPage() {
   const [activeCats, setActiveCats] = useState([]);
   const [categoryRows, setCategoryRows] = useState([]);
   const [locationQuery, setLocationQuery] = useState("");
-  const [searchedLocation, setSearchedLocation] = useState(null);
   const { data: mapRows = EMPTY_MAP_ROWS, isLoading: loading, error } = useMapCompanies();
   const [userPosition, setUserPosition] = useState(null);
-
-  // Resolve typed place names so the map can move to a real location instead
-  // of only filtering the already-loaded company list.
-  useEffect(() => {
-    const query = locationQuery.trim();
-    if (!query) {
-      setSearchedLocation(null);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
-          { signal: controller.signal, headers: { Accept: "application/json" } },
-        );
-        const results = await response.json();
-        const match = results?.[0];
-        if (match) setSearchedLocation([Number(match.lat), Number(match.lon)]);
-      } catch (requestError) {
-        if (requestError.name !== "AbortError") setSearchedLocation(null);
-      }
-    }, 350);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [locationQuery]);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -102,7 +71,6 @@ export default function MapPage() {
     () => companies.filter((c) => activeCats.includes(c.category) && (!locationQuery || [
       c.name,
       c.category_name,
-      c.address,
       ...(Array.isArray(c.products) ? c.products.flatMap((product) => [product, product?.product_name, product?.name]) : []),
     ].some((value) => String(value || "").toLowerCase().includes(locationQuery.trim().toLowerCase())))),
     [activeCats, companies, locationQuery]
@@ -137,7 +105,7 @@ export default function MapPage() {
 
   const allChecked = activeCats.length === categoryRows.length;
   const toggleAll = () => setActiveCats(allChecked ? [] : categoryRows.map((c) => c.id));
-  const mapCenter = searchedLocation || (userPosition ? [userPosition.lat, userPosition.lng] : (nearest[0] ? [nearest[0].lat, nearest[0].lng] : NIA_CENTER));
+  const mapCenter = userPosition ? [userPosition.lat, userPosition.lng] : (nearest[0] ? [nearest[0].lat, nearest[0].lng] : NIA_CENTER);
 
   return (
     <>
