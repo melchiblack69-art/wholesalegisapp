@@ -41,9 +41,9 @@ exports.register = async (req, res) => {
       `SELECT id
        FROM users
        WHERE (email = ? OR phone = ?)
-       AND role = "user"
+       AND role = ?
        LIMIT 1`,
-      [email, phone]
+      [email, phone, "user"]
     );
 
     if (exists.length) {
@@ -107,9 +107,9 @@ exports.login = async (req, res) => {
         last_login
        FROM users
        WHERE (email = ? OR phone = ?)
-       AND role = "user"
+       AND role = ?
        LIMIT 1`,
-      [email, email]
+      [email, email,"user"]
     );
 
     if (!rows.length) {
@@ -152,6 +152,7 @@ exports.login = async (req, res) => {
         role: user.role,
         photo: user.photo ?? null,
         phone: user.phone,
+        createdAt: user.created_at,
         lastLogin: new Date(),
       },
     });
@@ -173,8 +174,9 @@ exports.changePassword = async (req, res) => {
     if (!currentPassword || !newPassword)
       return res.status(400).json({ message: "All fields are required" });
 
-    const [rows] = await db.execute("SELECT password FROM users WHERE id = ? AND role='user'", [
+    const [rows] = await db.execute(`SELECT password FROM users WHERE id = ? AND role=?`, [
       adminId,
+      "user"
     ]);
 
     if (!rows.length)
@@ -223,8 +225,8 @@ exports.updateUser = async (req, res) => {
 
     // ── 2. Verify user exists ─────────────────────────────────
     const [rows] = await db.query(
-      `SELECT id, name, email, phone, photo FROM users WHERE id = ? AND role = 'user' `,
-      [userId]
+      `SELECT id, name, email, phone, photo FROM users WHERE id = ? AND role = ? `,
+      [userId, "user"]
     );
 
     if (!rows.length) {
