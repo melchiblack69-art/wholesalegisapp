@@ -12,7 +12,7 @@ export default function BottomNav() {
   return (
     <nav
       className="d-lg-none position-fixed bottom-0 start-0 w-100 bg-white border-top d-flex"
-      style={{ height: "var(--bottomnav-h)", zIndex: 1030 }}
+      style={{ height: "calc(var(--bottomnav-h) + env(safe-area-inset-bottom))", paddingBottom: "env(safe-area-inset-bottom)", zIndex: 1030 }}
     >
       {tabs.map((t) => (
         <NavLink

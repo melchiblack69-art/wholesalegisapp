@@ -7,6 +7,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import { companyImageUrl, companyGalleryUrls } from "../utils/image";
 import ImageCarousel from "../components/ImageCarousel";
 import { api } from "../api/client";
+import { shareCompany } from "../utils/shareCompany";
 import { haversineDistance } from "../utils/haversine";
 
 function formatHours(hours) {
@@ -49,27 +50,52 @@ export default function CompanyDetail() {
       .get(`/api/user/company/${id}/images`)
       .then((data) => setImages(data?.images || []))
       .catch(() => {});
-    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(
-      ({ coords }) => setUserPosition({ lat: coords.latitude, lng: coords.longitude }),
-      () => setUserPosition(null), { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-    api.get("/api/user/companies").then(async (rows) => {
-      const candidates = Array.isArray(rows)
-        ? rows
-            .filter((row) => String(row.id) !== String(id))
-            .map((row) => ({ ...row, name: row.name || row.company_name, distanceKm: userPosition ? haversineDistance(userPosition.lat, userPosition.lng, row.latitude, row.longitude) : null }))
-            .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
-            .slice(0, 3)
-        : [];
-      const withImages = await Promise.all(candidates.map(async (row) => {
-        try {
-          const data = await api.get(`/api/user/company/${row.id}/images`);
-          const cover = (data?.images || []).find((image) => image.is_cover) || data?.images?.[0];
-          return { ...row, cover_image: cover?.url || null };
-        } catch { return row; }
-      }));
-      setNearby(withImages);
-    })
+    if (navigator.geolocation)
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) =>
+          setUserPosition({ lat: coords.latitude, lng: coords.longitude }),
+        () => setUserPosition(null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      );
+    api
+      .get("/api/user/companies")
+      .then(async (rows) => {
+        const candidates = Array.isArray(rows)
+          ? rows
+              .filter((row) => String(row.id) !== String(id))
+              .map((row) => ({
+                ...row,
+                name: row.name || row.company_name,
+                distanceKm: userPosition
+                  ? haversineDistance(
+                      userPosition.lat,
+                      userPosition.lng,
+                      row.latitude,
+                      row.longitude,
+                    )
+                  : null,
+              }))
+              .sort(
+                (a, b) =>
+                  (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity),
+              )
+              .slice(0, 3)
+          : [];
+        const withImages = await Promise.all(
+          candidates.map(async (row) => {
+            try {
+              const data = await api.get(`/api/user/company/${row.id}/images`);
+              const cover =
+                (data?.images || []).find((image) => image.is_cover) ||
+                data?.images?.[0];
+              return { ...row, cover_image: cover?.url || null };
+            } catch {
+              return row;
+            }
+          }),
+        );
+        setNearby(withImages);
+      })
       .catch(() => {});
   }, [id, userPosition]);
 
@@ -105,7 +131,11 @@ export default function CompanyDetail() {
         title=""
         rightIcons={
           <>
-            <button className="btn btn-sm border-0 p-0 me-3" aria-label="Share">
+            <button
+              className="btn btn-sm border-0 p-0 me-3"
+              aria-label="Share company"
+              onClick={() => shareCompany(company)}
+            >
               <i className="bi bi-share fs-5" />
             </button>
             <button
@@ -242,7 +272,26 @@ export default function CompanyDetail() {
                       className="d-flex align-items-center justify-content-between text-decoration-none text-dark py-2 border-bottom"
                     >
                       <div className="d-flex align-items-center gap-2">
-                        {companyImageUrl(n) ? <img src={companyImageUrl(n)} loading="lazy" alt={n.name} className="rounded-2" style={{ width: 40, height: 40, objectFit: "cover" }} /> : <span className="icon-circle bg-primary-light text-primary-brand" style={{ width: 40, height: 40 }}><i className="bi bi-buildings" /></span>}
+                        {companyImageUrl(n) ? (
+                          <img
+                            src={companyImageUrl(n)}
+                            loading="lazy"
+                            alt={n.name}
+                            className="rounded-2"
+                            style={{
+                              width: 40,
+                              height: 40,
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="icon-circle bg-primary-light text-primary-brand"
+                            style={{ width: 40, height: 40 }}
+                          >
+                            <i className="bi bi-buildings" />
+                          </span>
+                        )}
                         <div className="d-flex flex-column">
                           <span
                             style={{ fontSize: "0.88rem" }}
@@ -303,7 +352,22 @@ export default function CompanyDetail() {
                     className="d-flex align-items-center justify-content-between text-decoration-none text-dark py-2"
                   >
                     <div className="d-flex align-items-center gap-2">
-                      {companyImageUrl(n) ? <img src={companyImageUrl(n)} loading="lazy" alt={n.name} className="rounded-2" style={{ width: 40, height: 40, objectFit: "cover" }} /> : <span className="icon-circle bg-primary-light text-primary-brand" style={{ width: 40, height: 40 }}><i className="bi bi-buildings" /></span>}
+                      {companyImageUrl(n) ? (
+                        <img
+                          src={companyImageUrl(n)}
+                          loading="lazy"
+                          alt={n.name}
+                          className="rounded-2"
+                          style={{ width: 40, height: 40, objectFit: "cover" }}
+                        />
+                      ) : (
+                        <span
+                          className="icon-circle bg-primary-light text-primary-brand"
+                          style={{ width: 40, height: 40 }}
+                        >
+                          <i className="bi bi-buildings" />
+                        </span>
+                      )}
                       <span style={{ fontSize: "0.85rem" }}>{n.name}</span>
                     </div>
                     <span

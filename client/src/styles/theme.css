@@ -38,6 +38,7 @@ html,
 body {
   background: var(--color-bg);
   color: var(--color-text);
+  max-width: 100%;
 }
 
 body {
@@ -64,11 +65,22 @@ h1, h2, h3, .font-display {
 .content-wrap {
   padding-top: var(--header-h-mobile);
   min-height: 100vh;
+  width: 100%;
 }
 @media (min-width: 992px) {
   .content-wrap {
     padding-top: 0;
   }
+}
+
+@media (max-width: 991.98px) {
+  html, body, #root { width:100%; overflow-x:hidden; }
+  body { padding-bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom)); }
+  .content-wrap { min-height: calc(100vh - var(--header-h-mobile)); overflow-x:clip; }
+  .container, .container-fluid { max-width:100%; }
+  .row { --bs-gutter-x: 1rem; margin-left:0; margin-right:0; }
+  img, svg, video, canvas { max-width:100%; }
+  button, a, input, select, textarea { -webkit-tap-highlight-color:transparent; }
 }
 
 .text-primary-brand {
@@ -177,6 +189,13 @@ h1, h2, h3, .font-display {
     width: 28px;
     height: 28px;
   }
+}
+
+@media (max-width: 991.98px) {
+  .position-fixed.top-0 { max-width:100%; }
+  .leaflet-container { touch-action: pan-x pan-y; }
+  .card-surface { min-width:0; }
+  .profile-card { margin-left:0; margin-right:0; max-width:none; }
 }
 
 .line-clamp-2 {
