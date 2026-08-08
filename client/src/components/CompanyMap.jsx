@@ -68,6 +68,8 @@ export default function CompanyMap({
   onSelect = null,
   recenterOnCenterChange = false,
   userPosition = null,
+  locationPosition = null,
+  locationLabel = "Selected location",
 }) {
 
   return (
@@ -83,6 +85,8 @@ export default function CompanyMap({
         {recenterOnCenterChange && <RecenterOnChange center={center} />}
 
         {showUserLocation && <Marker position={userPosition || center} icon={userIcon()}><Tooltip permanent direction="top" offset={[0, -20]}>You</Tooltip></Marker>}
+
+        {locationPosition && <Marker position={locationPosition} icon={pinIcon("#c52323")}><Tooltip permanent direction="top" offset={[0, -30]}>{locationLabel}</Tooltip></Marker>}
 
         {companies.map((c) => {
           const lat = Number(c.lat ?? c.latitude);

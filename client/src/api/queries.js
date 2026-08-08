@@ -59,6 +59,22 @@ export function useCompanies() {
 export function useMapCompanies() {
   return useLoggedQuery("map-companies", { queryKey: queryKeys.mapCompanies, queryFn: loggedQuery("map-companies", queryKeys.mapCompanies, () => api.get("/api/user/map")), staleTime: 2 * 60 * 1000, select: (rows) => Array.isArray(rows) ? rows : [] });
 }
+export function useAccraLocationSuggestions(query) {
+  const normalizedQuery = query.trim();
+  return useQuery({
+    queryKey: ["accra-location-suggestions", normalizedQuery.toLowerCase()],
+    queryFn: async () => {
+      const params = new URLSearchParams({ format: "jsonv2", addressdetails: "1", limit: "5", countrycodes: "gh", bounded: "1", viewbox: "-0.55,5.85,0.35,5.45", q: `${normalizedQuery}, Accra, Ghana` });
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Location search failed");
+      const rows = await response.json();
+      return Array.isArray(rows) ? rows : [];
+    },
+    enabled: normalizedQuery.length >= 2,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
 export function useStats() {
   return useLoggedQuery("stats", { queryKey: queryKeys.stats, queryFn: loggedQuery("stats", queryKeys.stats, () => api.get("/api/user/stats")), staleTime: 10 * 60 * 1000 });
 }

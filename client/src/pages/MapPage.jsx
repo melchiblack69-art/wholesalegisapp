@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import Fuse from "fuse.js";
+import debounce from "lodash.debounce";
+import { RingLoader } from "react-spinners";
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import CompanyMap, { NIA_CENTER } from "../components/CompanyMap";
-import { useCompanyImages, useMapCompanies } from "../api/queries";
+import { useAccraLocationSuggestions, useCompanyImages, useMapCompanies } from "../api/queries";
 import { companyImageUrl } from "../utils/image";
 import { useFavorites } from "../context/FavoritesContext";
 import { haversineDistance } from "../utils/haversine";
@@ -18,8 +21,61 @@ export default function MapPage() {
   const [activeCats, setActiveCats] = useState([]);
   const [categoryRows, setCategoryRows] = useState([]);
   const [locationQuery, setLocationQuery] = useState("");
+  const [searchedLocation, setSearchedLocation] = useState(null);
+  const [searchedCompanyId, setSearchedCompanyId] = useState(null);
+  const [debouncedLocationQuery, setDebouncedLocationQuery] = useState("");
   const { data: mapRows = EMPTY_MAP_ROWS, isLoading: loading, error } = useMapCompanies();
   const [userPosition, setUserPosition] = useState(null);
+
+  /* location requests are debounced and cached by TanStack Query */
+  const updateDebouncedQuery = useMemo(() => debounce((value) => setDebouncedLocationQuery(value), 350), []);
+  useEffect(() => { updateDebouncedQuery(locationQuery); return () => updateDebouncedQuery.cancel(); }, [locationQuery, updateDebouncedQuery]);
+  const { data: locationSuggestions = [], isFetching: locationLoading } = useAccraLocationSuggestions(debouncedLocationQuery);
+
+  const companies = useMemo(() => (Array.isArray(mapRows) ? mapRows.map((company) => ({
+    id: company.id,
+    public_id: company.public_id,
+    name: company.name || company.company_name,
+    category: String(company.category_id || company.cat_id || company.category_name || "uncategorized"),
+    category_name: company.category_name,
+    category_color: company.color || "var(--color-primary)",
+    address: company.address,
+    cover_image: company.cover_image,
+    lat: Number(company.latitude),
+    lng: Number(company.longitude),
+    status: company.status || "Active",
+    products: company.products,
+  })) : []), [mapRows]);
+
+  const selectLocation = (result) => {
+    setSearchedLocation([Number(result.lat), Number(result.lon)]);
+    setSearchedCompanyId(null);
+    setLocationQuery(result.display_name.split(",").slice(0, 2).join(", "));
+  };
+
+  const localSuggestions = useMemo(() => {
+    const query = locationQuery.trim().toLowerCase();
+    if (query.length < 2) return [];
+    const searchable = companies.map((company) => ({ ...company, productsText: Array.isArray(company.products) ? company.products.map((product) => product?.product_name || product?.name || product).join(" ") : "" }));
+    return new Fuse(searchable, { keys: ["name", "category_name", "productsText"], threshold: 0.35 }).search(query).slice(0, 5).map(({ item }) => item);
+  }, [companies, locationQuery]);
+
+  const locationSuggestionsPanel = (localSuggestions.length > 0 || locationSuggestions.length > 0) ? (
+    <div className="position-absolute start-0 end-0 mt-1 bg-white rounded-3 shadow border overflow-hidden" style={{ zIndex: 1000, top: "100%" }}>
+      {localSuggestions.map((company) => (
+        <button type="button" key={`company-${company.id}`} className="w-100 text-start border-0 bg-white px-3 py-2 small" onClick={() => { setLocationQuery(company.name); setSearchedLocation([company.lat, company.lng]); setSearchedCompanyId(company.id); }}>
+          <i className="bi bi-buildings text-primary-brand me-2" />
+          <strong>{company.name}</strong><span className="text-muted-brand"> · {company.category_name || "Company"}</span>
+        </button>
+      ))}
+      {locationSuggestions.map((result) => (
+        <button type="button" key={result.place_id} className="w-100 text-start border-0 bg-white px-3 py-2 small" onClick={() => selectLocation(result)}>
+          <i className="bi bi-geo-alt text-primary-brand me-2" />
+          {result.display_name}
+        </button>
+      ))}
+    </div>
+  ) : null;
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -31,28 +87,6 @@ export default function MapPage() {
   }, []);
 
   
-  const companies = useMemo(() => {
-        const normalized = Array.isArray(mapRows)
-          ? mapRows.map((company) => {
-              const categoryId = String(company.category_id || company.cat_id || company.category_name || "uncategorized");
-              return {
-                id: company.id,
-                public_id: company.public_id,
-                name: company.name || company.company_name,
-                category: categoryId,
-                category_name: company.category_name,
-                category_color: company.color  || "var(--color-primary)",
-                address: company.address,
-                cover_image: company.cover_image,
-                lat: Number(company.latitude),
-                lng: Number(company.longitude),
-                status: company.status || "Active",
-              };
-            })
-          : [];
-        return normalized;
-  }, [mapRows]);
-
   useEffect(() => {
         const unique = Array.from(new Map(companies.map((c) => [c.category,
           { id: c.category, name: c.category_name || "Uncategorized" ,category_color: c.category_color || "var(--color-primary)", }])).values());
@@ -67,14 +101,14 @@ export default function MapPage() {
         });
   }, [companies]);
 
-  const filtered = useMemo(
-    () => companies.filter((c) => activeCats.includes(c.category) && (!locationQuery || [
-      c.name,
-      c.category_name,
-      ...(Array.isArray(c.products) ? c.products.flatMap((product) => [product, product?.product_name, product?.name]) : []),
-    ].some((value) => String(value || "").toLowerCase().includes(locationQuery.trim().toLowerCase())))),
-    [activeCats, companies, locationQuery]
-  );
+  const filtered = useMemo(() => companies.filter((c) => {
+    if (!activeCats.includes(c.category)) return false;
+    if (searchedCompanyId) return c.id === searchedCompanyId;
+    if (searchedLocation) return false;
+    if (!locationQuery) return true;
+    const values = [c.name, c.category_name, ...(Array.isArray(c.products) ? c.products.flatMap((product) => [product, product?.product_name, product?.name]) : [])];
+    return values.some((value) => String(value || "").toLowerCase().includes(locationQuery.trim().toLowerCase()));
+  }), [activeCats, companies, locationQuery, searchedLocation, searchedCompanyId]);
 
   const nearest = useMemo(
     () => [...filtered].map((c) => ({ ...c, distanceKm: userPosition ? haversineDistance(userPosition.lat, userPosition.lng, c.lat, c.lng) : null })),
@@ -92,7 +126,14 @@ export default function MapPage() {
 
 
   // default the sheet to the nearest company; keep selection if user taps a marker
+  const clearSearch = () => {
+    setLocationQuery("");
+    setSearchedLocation(null);
+    setSearchedCompanyId(null);
+  };
+
   const locateUser = () => {
+    clearSearch();
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => setUserPosition({ lat: coords.latitude, lng: coords.longitude }),
@@ -105,7 +146,7 @@ export default function MapPage() {
 
   const allChecked = activeCats.length === categoryRows.length;
   const toggleAll = () => setActiveCats(allChecked ? [] : categoryRows.map((c) => c.id));
-  const mapCenter = userPosition ? [userPosition.lat, userPosition.lng] : (nearest[0] ? [nearest[0].lat, nearest[0].lng] : NIA_CENTER);
+  const mapCenter = searchedLocation || (userPosition ? [userPosition.lat, userPosition.lng] : (nearest[0] ? [nearest[0].lat, nearest[0].lng] : NIA_CENTER));
 
   return (
     <>
@@ -114,15 +155,18 @@ export default function MapPage() {
       {/* ---------- MOBILE ---------- */}
       <div className="d-lg-none position-relative" style={{ height: "calc(100vh - var(--header-h-mobile) - var(--bottomnav-h))", overflow: "hidden" }}>
         <div className="position-absolute w-100 px-3 d-flex gap-2" style={{ top: 12, zIndex: 500 }}>
-          <div className="search-shell d-flex align-items-center flex-fill rounded-3 px-3 py-2 shadow-sm">
+          <div className="search-shell d-flex align-items-center flex-fill rounded-3 px-3 py-2 shadow-sm position-relative">
             <i className="bi bi-search text-muted-brand me-2" />
             <input
               className="border-0 flex-fill bg-transparent"
               style={{ outline: "none", fontSize: "0.9rem" }}
               placeholder="Search in this area"
               value={locationQuery}
-              onChange={(e) => setLocationQuery(e.target.value)}
+              onChange={(e) => { const value = e.target.value; setLocationQuery(value); if (!value.trim()) { setSearchedLocation(null); setSearchedCompanyId(null); } }}
             />
+            {locationQuery && <button type="button" className="btn btn-sm border-0 p-0 text-muted-brand" onClick={clearSearch} aria-label="Clear search"><i className="bi bi-x-circle-fill" /></button>}
+            {locationLoading && <RingLoader size={16} color="#1c6b41" aria-label="Searching locations" />}
+            {locationSuggestionsPanel}
           </div>
           <button className="btn bg-white rounded-3 shadow-sm px-3 border-0" aria-label="Filters">
             <i className="bi bi-sliders" />
@@ -136,6 +180,8 @@ export default function MapPage() {
           companies={nearest}
           center={mapCenter}
           userPosition={userPosition ? [userPosition.lat, userPosition.lng] : null}
+          locationPosition={searchedLocation}
+          locationLabel="Selected location"
           showUserLocation={Boolean(userPosition)}
           height="100%"
           selectedId={selected?.id}
@@ -192,15 +238,18 @@ export default function MapPage() {
           <h1 className="fw-bold mb-3 font-display" style={{ fontSize: "1.3rem" }}>
             Interactive Map
           </h1>
-          <div className="search-shell d-flex align-items-center rounded-3 px-3 py-2 mb-4">
+          <div className="search-shell d-flex align-items-center rounded-3 px-3 py-2 mb-4 position-relative">
             <i className="bi bi-search text-muted-brand me-2" />
             <input
               className="border-0 flex-fill bg-transparent"
               style={{ outline: "none", fontSize: "0.9rem" }}
               placeholder="Search location..."
               value={locationQuery}
-              onChange={(e) => setLocationQuery(e.target.value)}
+              onChange={(e) => { const value = e.target.value; setLocationQuery(value); if (!value.trim()) { setSearchedLocation(null); setSearchedCompanyId(null); } }}
             />
+            {locationQuery && <button type="button" className="btn btn-sm border-0 p-0 text-muted-brand" onClick={clearSearch} aria-label="Clear search"><i className="bi bi-x-circle-fill" /></button>}
+            {locationLoading && <RingLoader size={16} color="#1c6b41" aria-label="Searching locations" />}
+            {locationSuggestionsPanel}
           </div>
 
           <p className="fw-semibold mb-2" style={{ fontSize: "0.9rem" }}>
@@ -251,7 +300,7 @@ export default function MapPage() {
         </aside>
 
         <div className="flex-fill">
-          <CompanyMap companies={nearest} center={mapCenter} userPosition={userPosition ? [userPosition.lat, userPosition.lng] : null} showUserLocation={Boolean(userPosition)} height={640} zoom={14} selectedId={selected?.id} onSelect={setSelectedId} />
+          <CompanyMap companies={nearest} center={mapCenter} userPosition={userPosition ? [userPosition.lat, userPosition.lng] : null} locationPosition={searchedLocation} locationLabel="Selected location" showUserLocation={Boolean(userPosition)} height={640} zoom={14} selectedId={selected?.id} onSelect={setSelectedId} />
         </div>
       </div>
     </>
