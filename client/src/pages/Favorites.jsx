@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import MobileHeader from "../components/MobileHeader";
 import CompanyCard from "../components/CompanyCard";
@@ -6,11 +7,29 @@ import { useFavorites } from "../context/FavoritesContext";
 import { companyImageUrl } from "../utils/image";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { formatDistance } from "../utils/distance";
+import { haversineDistance } from "../utils/haversine";
 
 export default function Favorites() {
   const { favorites, toggleFavorite } = useFavorites();
   const { data: companies = [], isLoading } = useCompanies();
-  const favCompanies = companies.filter((c) => favorites.includes(c.id));
+  const [userPosition, setUserPosition] = useState(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return undefined;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setUserPosition({ lat: coords.latitude, lng: coords.longitude }),
+      () => setUserPosition(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+    return undefined;
+  }, []);
+
+  const favCompanies = useMemo(() => companies
+    .filter((c) => favorites.includes(c.id) || (c.public_id && favorites.includes(c.public_id)))
+    .map((c) => ({
+      ...c,
+      distanceKm: userPosition ? haversineDistance(userPosition.lat, userPosition.lng, c.latitude, c.longitude) : null,
+    })), [companies, favorites, userPosition]);
 
   return (
     <>
