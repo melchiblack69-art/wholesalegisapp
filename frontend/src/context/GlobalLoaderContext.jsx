@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { subscribeGlobalLoading } from "../util/loadBus";
+import { subscribeGlobalLoading } from "../utils/loadBus";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 export  function GlobalLoader() {

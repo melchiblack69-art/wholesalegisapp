@@ -75,6 +75,36 @@ export function useAccraLocationSuggestions(query) {
     gcTime: 30 * 60 * 1000,
   });
 }
+export function useGraphHopperRoute({ origin, destination, mode, enabled }) {
+  const roundedOrigin = origin ? origin.map((value) => Number(value.toFixed(4))) : null;
+  const roundedDestination = destination ? destination.map((value) => Number(value.toFixed(5))) : null;
+  return useQuery({
+    queryKey: ["graphhopper-route", roundedOrigin, roundedDestination, mode],
+    queryFn: async () => {
+      const key = import.meta.env.VITE_GRAPHHOPPER_API_KEY;
+      if (!key) throw new Error("GraphHopper API key is not configured");
+      const params = new URLSearchParams({
+        profile: mode === "driving" ? "car" : mode === "cycling" ? "bike" : "foot",
+        points_encoded: "false",
+        instructions: "true",
+        key,
+      });
+      params.append("point", `${roundedOrigin[0]},${roundedOrigin[1]}`);
+      params.append("point", `${roundedDestination[0]},${roundedDestination[1]}`);
+      const response = await fetch(`https://graphhopper.com/api/1/route?${params}`);
+      if (!response.ok) throw new Error("Unable to load route");
+      const data = await response.json();
+      const path = data.paths?.[0];
+      if (!path) throw new Error("No route found");
+      return { points: path.points?.coordinates?.map(([lng, lat]) => [lat, lng]) || [], distance: path.distance, time: path.time, instructions: path.instructions || [] };
+    },
+    enabled: Boolean(enabled && roundedOrigin && roundedDestination),
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    placeholderData: (previous) => previous,
+  });
+}
 export function useStats() {
   return useLoggedQuery("stats", { queryKey: queryKeys.stats, queryFn: loggedQuery("stats", queryKeys.stats, () => api.get("/api/user/stats")), staleTime: 10 * 60 * 1000 });
 }

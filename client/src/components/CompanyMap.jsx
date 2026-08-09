@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import L from "leaflet";
 import { Link } from "react-router-dom";
 import { formatDistance } from "../utils/distance";
-
+import { useAuth } from "../context/AuthContext";
 const NIA_CENTER = [5.5715, -0.2298];
 
 function pinIcon(color, active = false) {
@@ -22,6 +22,7 @@ function pinIcon(color, active = false) {
     popupAnchor: [0, -h + 4],
   });
 }
+
 
 function companyIcon(color) {
   return L.divIcon({ className: "company-map-icon", html: `<span style="background:${color};--marker-color:${color}"><i class="bi bi-buildings"></i></span>`, iconSize: [34, 43], iconAnchor: [17, 21] });
@@ -56,7 +57,6 @@ function MapViewController({ center, zoom, pinPosition }) {
 
   return null;
 }
-
 export default function CompanyMap({
   companies,
   center = NIA_CENTER,
@@ -71,7 +71,10 @@ export default function CompanyMap({
   locationPosition = null,
   locationLabel = "Selected location",
 }) {
+  const { user } = useAuth();
+  const userLabel = user?.name?.trim() || "You";
 
+  
   return (
     <div style={{ height, width: "100%", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
       <MapContainer center={center} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
@@ -84,7 +87,7 @@ export default function CompanyMap({
 
         {recenterOnCenterChange && <RecenterOnChange center={center} />}
 
-        {showUserLocation && <Marker position={userPosition || center} icon={userIcon()}><Tooltip permanent direction="top" offset={[0, -20]}>You</Tooltip></Marker>}
+        {showUserLocation && <Marker position={userPosition || center} icon={userIcon()}><Popup>{userLabel}</Popup></Marker>}
 
         {locationPosition && <Marker position={locationPosition} icon={pinIcon("#c52323")}><Tooltip permanent direction="top" offset={[0, -30]}>{locationLabel}</Tooltip></Marker>}
 

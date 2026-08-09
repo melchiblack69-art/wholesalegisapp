@@ -3,9 +3,16 @@ import MobileHeader from "../components/MobileHeader";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 const publicId = (entity) => entity?.public_id || entity?.id;
-
+  function dateHelper(date) {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+}
 /**
  * Profile display + editor for the user-facing app.
  * - "Edit Profile" toggles inputs in place (Save / Cancel).
@@ -28,6 +35,12 @@ export default function ProfileDisplay({
 }) {
   const { user: authUser, updateCurrentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const { data: dbFavorites = [] } = useQuery({
+    queryKey: ["user-favorites", authUser?.id],
+    queryFn: () => api.get("/api/user/favorites"),
+    enabled: Boolean(authUser?.id),
+    staleTime: 60 * 1000,
+  });
   const user = providedUser || authUser || {
     name: "Kwame Mensah",
     email: "kwame.mensah@example.com",
@@ -278,14 +291,14 @@ export default function ProfileDisplay({
 
       <div className="profile-body">
         <div className="profile-heading">
-          <div><h2 className="profile-name">{user.name}</h2><p className="profile-since">Member since {user.memberSince || "—"}</p></div>
+          <div><h2 className="profile-name">{user.name}</h2><p className="profile-since">Member since: {dateHelper(user.memberSince) || "—"}</p></div>
           <span className="profile-status"><i className="bi bi-shield-check me-1" />Active account</span>
         </div>
 
         {/* Stats row */}
         <div className="profile-stats">
           <div className="profile-stat">
-            <span className="profile-stat-value">{user.stats?.favorites ?? 0}</span>
+            <span className="profile-stat-value">{dbFavorites.length}</span>
             <span className="profile-stat-label">Favorites</span>
           </div>
           <div className="profile-stat-divider" />

@@ -15,6 +15,7 @@ function normalizeUser(payload) {
     email: source.email ?? "",
     phone: source.phone ?? "",
     role: source.role,
+    memberSince: source.created_at,
     photo: source.photo ?? source.avatar ?? source.profile_photo ?? source.image ?? source.image_url ?? source.imageUrl ?? null,
     companyId: source.company_id ?? source.companyId ?? null,
   };

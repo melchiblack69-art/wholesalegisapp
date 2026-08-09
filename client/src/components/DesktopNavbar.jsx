@@ -26,7 +26,7 @@ export default function DesktopNavbar() {
       <div className="d-flex align-items-center justify-content-between w-100 mx-auto" style={{ maxWidth: 1320 }}>
         <NavLink to="/" className="d-flex align-items-center gap-2 text-decoration-none">
           <span className="icon-circle bg-primary-brand text-white" style={{ width: 38, height: 38 }}>
-            {systemLogo ? <img src={systemLogo} alt="North Industrial Area Wholesale Locator" className="sidebar-logo" /> : <i className="bi bi-shop" />}
+            {systemLogo ? <img src={systemLogo} alt="North Industrial Area Wholesale Locator" className="sidebar-logo" /> : <i className="bi bi-buildings" />}
           </span>
           <span className="d-flex flex-column lh-1">
             <span className="fw-bold text-dark" style={{ fontSize: "1.05rem" }}>

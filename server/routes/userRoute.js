@@ -8,7 +8,8 @@ const { login, getMe, getAllCompanies, getCompanyDetail, help,
     deleteUserPhoto,
     deleteUserAccount,
     updateUser,
-    uploadUserPhoto
+   uploadUserPhoto
+   ,getFavorites, addFavorite, removeFavorite
    } = require("../controller/userController");
 const { getMapCompanies } = require("../controller/mapController");
 const { getCompanyImages } = require("../controller/imageController");
@@ -23,6 +24,9 @@ router.put("/update/:id", protect, checkMaintenance, updateUser);
 router.delete("/:id/photo", protect, checkMaintenance,deleteUserPhoto);
 router.put("/:id/photo", protect, checkMaintenance, upload.single("photo"), uploadUserPhoto);
 router.delete("/delete-account/:id", protect, checkMaintenance, deleteUserAccount);
+router.get("/favorites", protect, checkMaintenance, getFavorites);
+router.post("/favorites", protect, checkMaintenance, addFavorite);
+router.delete("/favorites/:companyId", protect, checkMaintenance, removeFavorite);
 //
 router.get("/company-product/:id", getProducts);
 router.get("/categories",  getCategories);

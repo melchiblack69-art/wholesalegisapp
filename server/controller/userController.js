@@ -108,7 +108,8 @@ exports.login = async (req, res) => {
         password,
         role,
         photo,
-        last_login
+        last_login,
+        created_at
        FROM users
        WHERE (email = ? OR phone = ?)
        AND role = ?
@@ -455,7 +456,7 @@ exports.getAllCompanies = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, public_id, name, email, phone, role, photo
+      `SELECT id, public_id, name, email, phone, role, photo,created_at
        FROM users WHERE id = ?`,
       [req.user?.id],
     );
@@ -628,3 +629,42 @@ exports.getProducts = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   };
 }
+
+exports.getFavorites = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT c.public_id
+      FROM user_favorites f
+      INNER JOIN companies c ON c.id = f.company_id
+      WHERE f.user_id = ?
+      ORDER BY f.created_at DESC
+    `, [req.user.id]);
+    res.json(rows.map((row) => row.public_id));
+  } catch (error) {
+    console.error("getFavorites error:", error);
+    res.status(500).json({ message: "Unable to load favorites" });
+  }
+};
+
+exports.addFavorite = async (req, res) => {
+  try {
+    const companyId = await resolveInternalId(db, "companies", req.body?.company_id);
+    if (!companyId) return res.status(404).json({ message: "Company not found" });
+    await db.query("INSERT IGNORE INTO user_favorites (user_id, company_id) VALUES (?, ?)", [req.user.id, companyId]);
+    res.status(201).json({ message: "Favorite saved" });
+  } catch (error) {
+    console.error("addFavorite error:", error);
+    res.status(500).json({ message: "Unable to save favorite" });
+  }
+};
+
+exports.removeFavorite = async (req, res) => {
+  try {
+    const companyId = await resolveInternalId(db, "companies", req.params.companyId);
+    if (companyId) await db.query("DELETE FROM user_favorites WHERE user_id = ? AND company_id = ?", [req.user.id, companyId]);
+    res.json({ message: "Favorite removed" });
+  } catch (error) {
+    console.error("removeFavorite error:", error);
+    res.status(500).json({ message: "Unable to remove favorite" });
+  }
+};
