@@ -6,11 +6,22 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 const publicId = (entity) => entity?.public_id || entity?.id;
-  function dateHelper(date) {
-  return new Date(date).toLocaleDateString("en-US", {
+function dateHelper(value) {
+  if (!value) return "";
+
+  // MySQL returns timestamps as `YYYY-MM-DD HH:mm:ss`, which is not
+  // consistently parsed by all browsers. Convert it to an ISO-like value
+  // before creating the Date object.
+  const normalized = typeof value === "string"
+    ? value.trim().replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s+/, "$1T")
+    : value;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  return parsed.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 }
 /**

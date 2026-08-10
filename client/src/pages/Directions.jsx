@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import L from "leaflet";
 import MobileHeader from "../components/MobileHeader";
 import { useCompany, useGraphHopperRoute } from "../api/queries";
-import LoadingSpinner from "../components/LoadingSpinner";
 import { haversineDistance } from "../utils/haversine";
 import { createKalmanPosition } from "../utils/kalmanPosition";
 import { NIA_CENTER } from "../components/CompanyMap";
@@ -72,6 +71,16 @@ function formatDuration(ms) {
   return minutes < 60
     ? `${minutes} min`
     : `${Math.floor(minutes / 60)}h ${minutes % 60} min`;
+}
+
+function DirectionsSkeleton({ fullScreen = false }) {
+  return (
+    <div className={fullScreen ? "directions-skeleton-screen" : "directions-skeleton-card"} aria-label="Loading directions" role="status">
+      <span className="directions-skeleton-line directions-skeleton-line-lg" />
+      <span className="directions-skeleton-line" />
+      <span className="directions-skeleton-line directions-skeleton-line-sm" />
+    </div>
+  );
 }
 
 export default function Directions() {
@@ -223,24 +232,26 @@ export default function Directions() {
   const routeCenter = validPoint(origin) ? origin : NIA_CENTER;
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin[0]},${origin[1]}&destination=${destination?.[0]},${destination?.[1]}&travelmode=${mode === "cycling" ? "bicycling" : mode === "walking" ? "walking" : "driving"}`;
   const appleUrl = `https://maps.apple.com/?saddr=${origin[0]},${origin[1]}&daddr=${destination?.[0]},${destination?.[1]}&dirflg=${mode === "walking" ? "w" : mode === "cycling" ? "b" : "d"}`;
-  const safeRoutePoints =
-    route?.points
-      ?.filter((point) => validPoint(point))
-      .map((point) => point.map(Number)) || [];
-  const displayedRoutePoints = position && safeRoutePoints.length > 0
-    ? [[position.lat, position.lng], ...safeRoutePoints]
-    : safeRoutePoints;
+  const safeRoutePoints = useMemo(
+    () => (route?.mode === mode
+      ? route.points?.filter((point) => validPoint(point)).map((point) => point.map(Number)) || []
+      : []),
+    [mode, route],
+  );
   routePointsRef.current = safeRoutePoints;
-  const summary = route
+  const activeRoute = route?.mode === mode ? route : null;
+  const summary = activeRoute
     ? `${(route.distance / 1000).toFixed(1)} km · ${formatDuration(route.time)}`
     : "Route unavailable";
-  const instructions = Array.isArray(route?.instructions) ? route.instructions : [];
+  const instructions = Array.isArray(activeRoute?.instructions) ? activeRoute.instructions : [];
   const routePositionIndex = nearestRouteIndex(origin, safeRoutePoints);
   const currentInstruction = instructions.find((instruction) => {
     const interval = instruction?.interval;
     return Array.isArray(interval) && routePositionIndex >= interval[0] && routePositionIndex <= interval[1];
   }) || instructions[0];
-  const instructionText = currentInstruction?.text || (started ? "Follow the route" : "Start navigation");
+  const instructionText = routeLoading
+    ? ""
+    : currentInstruction?.text || (started ? "Follow the route" : "Start navigation");
   const instructionDistance = currentInstruction?.distance ? `${Math.round(currentInstruction.distance)} m` : "";
 
   useEffect(() => {
@@ -253,7 +264,7 @@ export default function Directions() {
     return () => window.speechSynthesis.cancel();
   }, [started, voiceEnabled, instructionText, summary]);
 
-  if (isLoading) return <LoadingSpinner fullScreen />;
+  if (isLoading) return <DirectionsSkeleton fullScreen />;
   if (isError || !company || !validDestination)
     return (
       <div className="container py-5 text-center">
@@ -298,7 +309,7 @@ export default function Directions() {
       initialCenter={destination}
       origin={routeCenter}
       destination={destination}
-      routePoints={displayedRoutePoints}
+      routePoints={safeRoutePoints}
       userIcon={userMarker}
       destinationIcon={marker}
       destinationColor={company.category_color || company.color || "#e0405a"}
@@ -312,18 +323,20 @@ export default function Directions() {
   const Controls = () => (
     <div className="position-relative" style={{ minHeight: 190 }}>
       <ModeSelector />
-      <div className="d-flex align-items-center gap-2 rounded-3 p-2 mb-3" style={{ background: "var(--color-primary-light)", color: "var(--color-primary-dark)" }}>
-        <i className={`bi ${currentInstruction?.sign < 0 ? "bi-arrow-left" : currentInstruction?.sign > 0 ? "bi-arrow-right" : "bi-arrow-up"} fs-4`} />
-        <div className="min-w-0">
-          <div className="fw-semibold text-truncate">{instructionText}</div>
-          {instructionDistance && <div className="small text-muted-brand">{instructionDistance}</div>}
+      {routeLoading ? <DirectionsSkeleton /> : (
+        <div className="d-flex align-items-center gap-2 rounded-3 p-2 mb-3" style={{ background: "var(--color-primary-light)", color: "var(--color-primary-dark)" }}>
+          <i className={`bi ${currentInstruction?.sign < 0 ? "bi-arrow-left" : currentInstruction?.sign > 0 ? "bi-arrow-right" : "bi-arrow-up"} fs-4`} />
+          <div className="min-w-0">
+            <div className="fw-semibold text-truncate">{instructionText}</div>
+            {instructionDistance && <div className="small text-muted-brand">{instructionDistance}</div>}
+          </div>
+          {started && "speechSynthesis" in window && (
+            <button type="button" className="btn btn-sm btn-light rounded-circle ms-auto flex-shrink-0" onClick={() => setVoiceEnabled((enabled) => !enabled)} aria-label={voiceEnabled ? "Mute voice guidance" : "Enable voice guidance"} title={voiceEnabled ? "Mute voice guidance" : "Enable voice guidance"}>
+              <i className={`bi ${voiceEnabled ? "bi-volume-up-fill" : "bi-volume-mute-fill"}`} />
+            </button>
+          )}
         </div>
-        {started && "speechSynthesis" in window && (
-          <button type="button" className="btn btn-sm btn-light rounded-circle ms-auto flex-shrink-0" onClick={() => setVoiceEnabled((enabled) => !enabled)} aria-label={voiceEnabled ? "Mute voice guidance" : "Enable voice guidance"} title={voiceEnabled ? "Mute voice guidance" : "Enable voice guidance"}>
-            <i className={`bi ${voiceEnabled ? "bi-volume-up-fill" : "bi-volume-mute-fill"}`} />
-          </button>
-        )}
-      </div>
+      )}
       {locationWarning && (
         <div className="alert alert-warning py-2 small">{locationWarning}</div>
       )}
@@ -384,7 +397,6 @@ export default function Directions() {
           </a>
         </div>
       )}
-      {routeLoading && <LoadingSpinner overlay />}
     </div>
   );
   return (
@@ -399,29 +411,29 @@ export default function Directions() {
           position: "relative",
         }}
       >
-        <div className="px-3 pt-3 position-absolute top-0 start-0 w-100" style={{ zIndex: 1200, pointerEvents: "auto", overflow: "visible" }}>
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <span className="rounded-circle" style={{ width: 10, height: 10, background: "var(--color-primary)" }} />
-            <span className="bg-white rounded-pill px-2 py-1 shadow-sm text-muted-brand small text-nowrap">My Location</span>
+        <div className="px-3 pt-3 position-absolute top-0 start-0 w-100" style={{ zIndex: 1200, pointerEvents: "auto", overflow: "visible", paddingLeft: 52 }}>
+          <div className="d-flex align-items-center gap-2 mb-2 bg-white rounded-3 shadow-sm px-3 py-2" style={{ width: "fit-content", maxWidth: "calc(100% - 16px)" }}>
+            <span className="rounded-circle flex-shrink-0" style={{ width: 10, height: 10, background: "var(--color-primary)" }} />
+            <span className="text-muted-brand small text-nowrap">My Location</span>
           </div>
-          <div className="d-flex align-items-center gap-2 w-100" style={{ minWidth: 0 }}>
+          <div className="d-flex align-items-center gap-2 bg-white rounded-3 shadow-sm px-3 py-2" style={{ width: "fit-content", maxWidth: "calc(100% - 16px)", minWidth: 0 }}>
             <i className="bi bi-geo-alt-fill text-danger flex-shrink-0" />
-            <span className="bg-white rounded-pill px-2 py-1 shadow-sm fw-medium small d-block" style={{ minWidth: 0, maxWidth: "calc(100% - 28px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{company.company_name}</span>
+            <span className="fw-medium small d-block" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{company.company_name || company.name}</span>
           </div>
         </div>
         <div className="position-absolute top-0 start-0 w-100 h-100" style={{ zIndex: 1 }}>
           {navigationMap}
         </div>
-        {!mobileSheetOpen && (
+        {!started && !routeError && (
           <button
             type="button"
             className="btn btn-brand rounded-pill shadow-lg position-absolute"
-            style={{ right: 16, bottom: 18, zIndex: 800 }}
-            onClick={() => { setMobileSheetOpen(true); setMobileSheetY(0); }}
-            aria-label="Open navigation instruction"
+            style={{ right: 16, bottom: 18, zIndex: 1250 }}
+            onClick={() => { setStarted(true); setMobileSheetOpen(true); setMobileSheetY(0); }}
+            aria-label="Start navigation"
           >
-            <i className={`bi ${currentInstruction?.sign < 0 ? "bi-arrow-left" : currentInstruction?.sign > 0 ? "bi-arrow-right" : "bi-signpost-2"} me-1`} />
-            <span className="text-truncate" style={{ maxWidth: 220 }}>{instructionDistance ? `${instructionDistance} · ` : ""}{instructionText}</span>
+            <i className="bi bi-signpost-2 me-1" />
+            Start Navigation
           </button>
         )}
         <div

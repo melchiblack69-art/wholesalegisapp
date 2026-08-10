@@ -89,7 +89,7 @@ export function useGraphHopperRoute({ origin, destination, mode, enabled }) {
       if (!response.ok) throw new Error("Unable to load route");
       const data = await response.json();
       if (!data?.points?.length) throw new Error("No route found");
-      return data;
+      return { ...data, mode };
     },
     enabled: Boolean(enabled && roundedOrigin && roundedDestination),
     staleTime: 30 * 1000,

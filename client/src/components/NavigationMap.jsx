@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
 
 function validPoint(point) {
@@ -52,7 +52,16 @@ function RecenterButton({ target }) {
   );
 }
 
-export default function NavigationMap({ height, initialCenter, origin, destination, routePoints, userIcon, destinationIcon, destinationColor, mode, heading, position, accuracy, animateToOrigin }) {
+const RouteLayers = memo(function RouteLayers({ points }) {
+  if (points.length <= 1) return null;
+  return <>
+    <Polyline positions={points} pathOptions={{ color: "#0b4fca", weight: 10, opacity: 0.28, lineCap: "round", lineJoin: "round" }} />
+    <Polyline positions={points} pathOptions={{ color: "#4285f4", weight: 6, opacity: 0.96, lineCap: "round", lineJoin: "round" }} />
+    <Polyline positions={points} pathOptions={{ color: "#d9e8ff", weight: 3, opacity: 0.9, dashArray: "1 18", lineCap: "round", className: "navigation-route-flow" }} />
+  </>;
+});
+
+function NavigationMap({ height, initialCenter, origin, destination, routePoints, userIcon, destinationIcon, destinationColor, mode, heading, position, accuracy, animateToOrigin }) {
   const safeOrigin = validPoint(origin) ? origin : initialCenter;
   const safeDestination = validPoint(destination) ? destination : null;
   const safeRoutePoints = Array.isArray(routePoints) ? routePoints.filter(validPoint) : [];
@@ -68,13 +77,11 @@ export default function NavigationMap({ height, initialCenter, origin, destinati
         </Marker>
         {position && Number.isFinite(Number(accuracy)) && <Circle className="navigation-accuracy-circle" center={safeOrigin} radius={Number(accuracy)} pathOptions={{ color: "#4285f4", fillColor: "#4285f4", fillOpacity: 0.12, weight: 2 }} />}
         {safeDestination && <Marker position={safeDestination} icon={destinationIcon(destinationColor)} />}
-        {safeRoutePoints.length > 1 && <>
-          <Polyline positions={safeRoutePoints} pathOptions={{ color: "#0b4fca", weight: 10, opacity: 0.28, lineCap: "round", lineJoin: "round" }} />
-          <Polyline positions={safeRoutePoints} pathOptions={{ color: "#4285f4", weight: 6, opacity: 0.96, lineCap: "round", lineJoin: "round" }} />
-          <Polyline positions={safeRoutePoints} pathOptions={{ color: "#d9e8ff", weight: 3, opacity: 0.9, dashArray: "1 18", lineCap: "round", className: "navigation-route-flow" }} />
-        </>}
+        <RouteLayers points={safeRoutePoints} />
         {position && <RecenterButton target={safeOrigin} />}
       </MapContainer>
     </div>
   );
 }
+
+export default memo(NavigationMap);
