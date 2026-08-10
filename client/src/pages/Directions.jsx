@@ -221,6 +221,10 @@ export default function Directions() {
   const summary = route
     ? `${(route.distance / 1000).toFixed(1)} km · ${formatDuration(route.time)}`
     : "Route unavailable";
+  const instructions = Array.isArray(route?.instructions) ? route.instructions : [];
+  const firstInstruction = instructions[0];
+  const instructionText = firstInstruction?.text || (started ? "Follow the route" : "Start navigation");
+  const instructionDistance = firstInstruction?.distance ? `${Math.round(firstInstruction.distance)} m` : "";
 
   if (isLoading) return <LoadingSpinner fullScreen />;
   if (isError || !company || !validDestination)
@@ -280,6 +284,13 @@ export default function Directions() {
   const Controls = () => (
     <div className="position-relative" style={{ minHeight: 190 }}>
       <ModeSelector />
+      <div className="d-flex align-items-center gap-2 rounded-3 p-2 mb-3" style={{ background: "var(--color-primary-light)", color: "var(--color-primary-dark)" }}>
+        <i className={`bi ${firstInstruction?.sign < 0 ? "bi-arrow-left" : firstInstruction?.sign > 0 ? "bi-arrow-right" : "bi-arrow-up"} fs-4`} />
+        <div className="min-w-0">
+          <div className="fw-semibold text-truncate">{instructionText}</div>
+          {instructionDistance && <div className="small text-muted-brand">{instructionDistance}</div>}
+        </div>
+      </div>
       {locationWarning && (
         <div className="alert alert-warning py-2 small">{locationWarning}</div>
       )}
@@ -355,14 +366,14 @@ export default function Directions() {
           position: "relative",
         }}
       >
-        <div className="px-3 pt-3 position-absolute top-0 start-0 w-100" style={{ zIndex: 600, pointerEvents: "none" }}>
+        <div className="px-3 pt-3 position-absolute top-0 start-0 w-100" style={{ zIndex: 1200, pointerEvents: "auto", overflow: "visible" }}>
           <div className="d-flex align-items-center gap-2 mb-2">
             <span className="rounded-circle" style={{ width: 10, height: 10, background: "var(--color-primary)" }} />
-            <span className="bg-white rounded-pill px-2 py-1 shadow-sm text-muted-brand small">My Location</span>
+            <span className="bg-white rounded-pill px-2 py-1 shadow-sm text-muted-brand small text-nowrap">My Location</span>
           </div>
           <div className="d-flex align-items-center gap-2">
             <i className="bi bi-geo-alt-fill text-danger" />
-            <span className="bg-white rounded-pill px-2 py-1 shadow-sm fw-medium small text-truncate" style={{ maxWidth: "calc(100% - 28px)" }}>{company.name}</span>
+            <span className="bg-white rounded-pill px-2 py-1 shadow-sm fw-medium small text-nowrap" style={{ maxWidth: "calc(100% - 28px)", overflow: "hidden", textOverflow: "ellipsis" }}>{company.name}</span>
           </div>
         </div>
         <div className="position-absolute top-0 start-0 w-100 h-100" style={{ zIndex: 1 }}>
@@ -374,10 +385,10 @@ export default function Directions() {
             className="btn btn-brand rounded-pill shadow-lg position-absolute"
             style={{ right: 16, bottom: 18, zIndex: 800 }}
             onClick={() => { setMobileSheetOpen(true); setMobileSheetY(0); }}
-            aria-label="Open navigation options"
+            aria-label="Open navigation instruction"
           >
-            <i className="bi bi-signpost-2 me-1" />
-            Options
+            <i className={`bi ${firstInstruction?.sign < 0 ? "bi-arrow-left" : firstInstruction?.sign > 0 ? "bi-arrow-right" : "bi-signpost-2"} me-1`} />
+            <span className="text-truncate" style={{ maxWidth: 220 }}>{instructionDistance ? `${instructionDistance} · ` : ""}{instructionText}</span>
           </button>
         )}
         <div
