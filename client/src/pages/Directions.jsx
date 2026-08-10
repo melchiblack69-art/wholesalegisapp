@@ -1,19 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-  Popup,
-  useMap,
-} from "react-leaflet";
 import L from "leaflet";
 import MobileHeader from "../components/MobileHeader";
 import { useCompany, useGraphHopperRoute } from "../api/queries";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { haversineDistance } from "../utils/haversine";
+import { createKalmanPosition } from "../utils/kalmanPosition";
 import { NIA_CENTER } from "../components/CompanyMap";
+import NavigationMap from "../components/NavigationMap";
 
 const modes = [
   { key: "driving", label: "Driving", icon: "bi-car-front-fill" },
@@ -25,92 +19,42 @@ const validPoint = (point) =>
   point.length === 2 &&
   point.every((value) => Number.isFinite(Number(value)));
 
+function distanceToRouteMeters(point, routePoints) {
+  if (!validPoint(point) || !Array.isArray(routePoints) || routePoints.length === 0) return Infinity;
+  return Math.min(...routePoints.map((routePoint) =>
+    haversineDistance(point[0], point[1], routePoint[0], routePoint[1]) * 1000,
+  ));
+}
+
 // Destination pin — unchanged, still used for the company location
 function marker(color = "#e0405a") {
   return L.divIcon({
     className: "directions-marker",
-    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:${color};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;"><i class="bi bi-buulding" style="color:white;font-size:13px;transform:rotate(45deg)"></i></div>`,
+    html: `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:${color};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;"><i class="bi bi-building" style="color:white;font-size:13px;transform:rotate(45deg)"></i></div>`,
     iconSize: [30, 30],
     iconAnchor: [15, 30],
   });
 }
 
-const modeColors = {
-  driving: "#2f6fed",
-  cycling: "#0ea472",
-  walking: "#f59e0b",
-};
-
 function userMarker(mode, heading) {
   const iconClass =
     modes.find((m) => m.key === mode)?.icon || "bi-geo-alt-fill";
-  const color = modeColors[mode] || "#2f6fed";
+  const color = "#1c6b41";
   const wedge = Number.isFinite(heading)
-    ? `<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 22px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid ${color};opacity:0.85"></div>`
+    ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 29px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid ${color};opacity:1"></div>`
     : "";
   return L.divIcon({
     className: "directions-marker",
     html: `
-      <div style="position:relative;width:34px;height:34px;">
+      <div style="position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;">
         ${wedge}
-        <div style="width:34px;height:34px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;">
-          <i class="bi ${iconClass}" style="color:white;font-size:15px;"></i>
-        </div>
+        <i class="bi ${iconClass}" style="color:${color};font-size:25px;text-shadow:0 1px 2px rgba(0,0,0,0.28);"></i>
       </div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 17],
   });
 }
 
-function Recenter({ center }) {
-  const map = useMap();
-  const hasCenteredOnce = useRef(false);
-
-  useEffect(() => {
-    if (!validPoint(center) || !map._loaded) return;
-    const size = map.getSize();
-    if (size.x === 0 || size.y === 0) return;
-
-    if (!hasCenteredOnce.current) {
-      map.setView(center, map.getZoom(), { animate: false });
-      hasCenteredOnce.current = true;
-    }
-  }, [center, map]);
-
-  useEffect(() => {
-    const id = setTimeout(() => map._loaded && map.invalidateSize(), 300);
-    return () => clearTimeout(id);
-  }, [map]);
-
-  return null;
-}
-function RecenterButton({ target }) {
-  const map = useMap();
-  if (!validPoint(target)) return null;
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        if (!map._loaded) return;
-        const size = map.getSize();
-        if (size.x === 0 || size.y === 0) return;
-        map.flyTo(target, map.getZoom(), { animate: true, duration: 1 });
-      }}
-      className="btn btn-light shadow-sm rounded-circle d-flex align-items-center justify-content-center"
-      style={{
-        position: "absolute",
-        bottom: 16,
-        right: 16,
-        width: 42,
-        height: 42,
-        zIndex: 1000,
-      }}
-      aria-label="Recenter on my location"
-    >
-      <i className="bi bi-crosshair2" />
-    </button>
-  );
-}
 function formatDuration(ms) {
   const minutes = Math.max(1, Math.round(ms / 60000));
   return minutes < 60
@@ -123,12 +67,25 @@ export default function Directions() {
   const { data: company, isLoading, isError } = useCompany(id);
   const [mode, setMode] = useState("driving");
   const [position, setPosition] = useState(null);
+  const [accuracy, setAccuracy] = useState(null);
   const [heading, setHeading] = useState(null);
   const [locationWarning, setLocationWarning] = useState("");
   const [started, setStarted] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState(NIA_CENTER);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 991.98px)").matches);
   const lastRouteOrigin = useRef(NIA_CENTER);
   const lastDisplayedPos = useRef(null);
+  const initialLocationCaptured = useRef(false);
+  const kalman = useRef(createKalmanPosition());
+  const routePointsRef = useRef([]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 991.98px)");
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
   const destination = company
     ? [
         Number(company.latitude ?? company.lat),
@@ -150,11 +107,15 @@ export default function Directions() {
     }
     const watch = navigator.geolocation.watchPosition(
       ({ coords }) => {
-        const next = {
-          lat: Number(coords.latitude),
-          lng: Number(coords.longitude),
-        };
-        if (!validPoint([next.lat, next.lng])) return;
+        const rawPoint = [Number(coords.latitude), Number(coords.longitude)];
+        if (!validPoint(rawPoint)) return;
+
+        // Before navigation starts, capture only one location for the preview.
+        // The active watch continues only after the user presses Start Navigation.
+        if (!started && initialLocationCaptured.current) return;
+        if (!started) initialLocationCaptured.current = true;
+
+        const next = kalman.current.update(rawPoint[0], rawPoint[1], Number(coords.accuracy) || 25);
 
         // Check jitter FIRST — before touching position state at all
         if (
@@ -164,7 +125,7 @@ export default function Directions() {
             lastDisplayedPos.current[1],
             next.lat,
             next.lng,
-          ) < 0.008
+          ) < 0.01
         ) {
           // moved less than ~8m — likely GPS noise, keep heading fresh, skip everything else
           if (Number.isFinite(coords.heading)) setHeading(coords.heading);
@@ -179,9 +140,11 @@ export default function Directions() {
           }
           return next;
         });
+        if (Number.isFinite(coords.accuracy)) setAccuracy(coords.accuracy);
         setLocationWarning("");
         if (Number.isFinite(coords.heading)) setHeading(coords.heading);
 
+        const offRoute = distanceToRouteMeters([next.lat, next.lng], routePointsRef.current) > 50;
         if (
           started &&
           haversineDistance(
@@ -189,7 +152,7 @@ export default function Directions() {
             lastRouteOrigin.current[1],
             next.lat,
             next.lng,
-          ) >= 0.05
+          ) >= 0.01 || offRoute
         ) {
           lastRouteOrigin.current = [next.lat, next.lng];
           setRouteOrigin([next.lat, next.lng]);
@@ -219,16 +182,19 @@ export default function Directions() {
     origin: routeOrigin,
     destination,
     mode,
-    enabled: validDestination && started,
+    enabled: validDestination && Boolean(routeOrigin),
   });
-  const active = modes.find((item) => item.key === mode);
   const routeCenter = validPoint(origin) ? origin : NIA_CENTER;
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin[0]},${origin[1]}&destination=${destination?.[0]},${destination?.[1]}&travelmode=${mode === "cycling" ? "bicycling" : mode === "walking" ? "walking" : "driving"}`;
-  const appleUrl = `http://maps.apple.com/?saddr=${origin[0]},${origin[1]}&daddr=${destination?.[0]},${destination?.[1]}&dirflg=${mode === "walking" ? "w" : mode === "cycling" ? "b" : "d"}`;
+  const appleUrl = `https://maps.apple.com/?saddr=${origin[0]},${origin[1]}&daddr=${destination?.[0]},${destination?.[1]}&dirflg=${mode === "walking" ? "w" : mode === "cycling" ? "b" : "d"}`;
   const safeRoutePoints =
     route?.points
       ?.filter((point) => validPoint(point))
       .map((point) => point.map(Number)) || [];
+  const displayedRoutePoints = position && safeRoutePoints.length > 0
+    ? [[position.lat, position.lng], ...safeRoutePoints]
+    : safeRoutePoints;
+  routePointsRef.current = safeRoutePoints;
   const summary = route
     ? `${(route.distance / 1000).toFixed(1)} km · ${formatDuration(route.time)}`
     : "Route unavailable";
@@ -271,38 +237,22 @@ export default function Directions() {
       ))}
     </div>
   );
-  const RouteMap = ({ height }) => (
-    <div style={{ height, width: "100%", position: "relative" }}>
-      <MapContainer
-        center={routeCenter}
-        zoom={15}
-        style={{ height: "100%", width: "100%", position: "relative" }}
-      >
-        <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        <Recenter center={routeCenter} />
-
-        <Marker position={origin} icon={userMarker(mode, heading)}>
-          <Popup>
-            {position
-              ? "Your live location"
-              : "North Industrial Area (fallback)"}
-          </Popup>
-        </Marker>
-        {validDestination && (
-          <Marker position={destination} icon={marker("#e0405a")} />
-        )}
-        {started && (
-          <Polyline
-            positions={safeRoutePoints}
-            pathOptions={{ color: "#2f6fed", weight: 5 }}
-          />
-        )}
-        {position && <RecenterButton target={origin} />}
-      </MapContainer>
-    </div>
+  const navigationMap = (
+    <NavigationMap
+      height="100%"
+      initialCenter={destination}
+      origin={routeCenter}
+      destination={destination}
+      routePoints={displayedRoutePoints}
+      userIcon={userMarker}
+      destinationIcon={marker}
+      destinationColor={company.category_color || company.color || "#e0405a"}
+      mode={mode}
+      heading={heading}
+      position={position}
+      accuracy={accuracy}
+      animateToOrigin={Boolean(position)}
+    />
   );
   const Controls = () => (
     <div className="position-relative" style={{ minHeight: 190 }}>
@@ -310,6 +260,12 @@ export default function Directions() {
       {locationWarning && (
         <div className="alert alert-warning py-2 small">{locationWarning}</div>
       )}
+      <div className="small text-muted-brand mb-2">
+        <i className="bi bi-crosshair2 me-1" />
+        {accuracy == null
+          ? "Locating you…"
+          : `GPS accuracy ±${Math.round(accuracy)} m${started ? " · Live navigation active" : " · Preview route"}`}
+      </div>
 
       {routeError && (
         <div className="text-danger small mb-2">
@@ -345,7 +301,7 @@ export default function Directions() {
         <div className="d-flex gap-2">
           <a
             className="btn btn-outline-secondary flex-fill"
-            href={googleUrl(mapsUrl)}
+            href={mapsUrl}
             target="_blank"
             rel="noreferrer"
           >
@@ -367,10 +323,12 @@ export default function Directions() {
   return (
     <>
       <MobileHeader variant="back" title="Directions" />
-      <div
+      {isMobile && <div
         className="d-lg-none d-flex flex-column"
         style={{
           height: "calc(100vh - var(--header-h-mobile) - var(--bottomnav-h))",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
         <div className="px-3 pt-3">
@@ -386,14 +344,14 @@ export default function Directions() {
             <span className="fw-medium small">{company.name}</span>
           </div>
         </div>
-        <div className="flex-fill" style={{ minHeight: 240 }}>
-          <RouteMap height="100%" />
+        <div className="flex-fill" style={{ minHeight: 0, overflow: "hidden" }}>
+          {navigationMap}
         </div>
         <div className="p-3 bg-white border-top">
           <Controls />
         </div>
-      </div>
-      <div
+      </div>}
+      {!isMobile && <div
         className="d-none d-lg-flex container-fluid py-4 px-4 gap-4"
         style={{ maxWidth: 1320, margin: "0 auto" }}
       >
@@ -415,13 +373,9 @@ export default function Directions() {
           </div>
         </aside>
         <div className="flex-fill">
-          <RouteMap height={640} />
+          <div style={{ height: 640 }}>{navigationMap}</div>
         </div>
-      </div>
+      </div>}
     </>
   );
-}
-
-function googleUrl(url) {
-  return url;
 }
