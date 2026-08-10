@@ -73,6 +73,9 @@ export default function Directions() {
   const [started, setStarted] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState(NIA_CENTER);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 991.98px)").matches);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [mobileSheetY, setMobileSheetY] = useState(220);
+  const sheetDrag = useRef(null);
   const lastRouteOrigin = useRef(NIA_CENTER);
   const lastDisplayedPos = useRef(null);
   const initialLocationCaptured = useRef(false);
@@ -86,6 +89,26 @@ export default function Directions() {
     media.addEventListener?.("change", update);
     return () => media.removeEventListener?.("change", update);
   }, []);
+
+  const startSheetDrag = (event) => {
+    if (!isMobile) return;
+    const point = event.touches?.[0] || event;
+    sheetDrag.current = { startY: point.clientY, startOffset: mobileSheetY };
+  };
+
+  const moveSheetDrag = (event) => {
+    if (!sheetDrag.current) return;
+    const point = event.touches?.[0] || event;
+    const next = Math.max(0, Math.min(260, sheetDrag.current.startOffset + point.clientY - sheetDrag.current.startY));
+    setMobileSheetY(next);
+  };
+
+  const endSheetDrag = () => {
+    if (!sheetDrag.current) return;
+    setMobileSheetOpen(mobileSheetY < 120);
+    setMobileSheetY(mobileSheetY < 120 ? 0 : 220);
+    sheetDrag.current = null;
+  };
   const destination = company
     ? [
         Number(company.latitude ?? company.lat),
@@ -329,25 +352,47 @@ export default function Directions() {
           height: "calc(100vh - var(--header-h-mobile) - var(--bottomnav-h))",
           minHeight: 0,
           overflow: "hidden",
+          position: "relative",
         }}
       >
-        <div className="px-3 pt-3">
+        <div className="px-3 pt-3 position-absolute top-0 start-0 w-100" style={{ zIndex: 600, pointerEvents: "none" }}>
           <div className="d-flex align-items-center gap-2 mb-2">
-            <span
-              className="rounded-circle"
-              style={{ width: 10, height: 10, background: "#2f6fed" }}
-            />
-            <span className="text-muted-brand small">My Location</span>
+            <span className="rounded-circle" style={{ width: 10, height: 10, background: "var(--color-primary)" }} />
+            <span className="bg-white rounded-pill px-2 py-1 shadow-sm text-muted-brand small">My Location</span>
           </div>
-          <div className="d-flex align-items-center gap-2 mb-3">
+          <div className="d-flex align-items-center gap-2">
             <i className="bi bi-geo-alt-fill text-danger" />
-            <span className="fw-medium small">{company.name}</span>
+            <span className="bg-white rounded-pill px-2 py-1 shadow-sm fw-medium small text-truncate" style={{ maxWidth: "calc(100% - 28px)" }}>{company.name}</span>
           </div>
         </div>
-        <div className="flex-fill" style={{ minHeight: 0, overflow: "hidden" }}>
+        <div className="position-absolute top-0 start-0 w-100 h-100" style={{ zIndex: 1 }}>
           {navigationMap}
         </div>
-        <div className="p-3 bg-white border-top">
+        {!mobileSheetOpen && (
+          <button
+            type="button"
+            className="btn btn-brand rounded-pill shadow-lg position-absolute"
+            style={{ right: 16, bottom: 18, zIndex: 800 }}
+            onClick={() => { setMobileSheetOpen(true); setMobileSheetY(0); }}
+            aria-label="Open navigation options"
+          >
+            <i className="bi bi-signpost-2 me-1" />
+            Options
+          </button>
+        )}
+        <div
+          className="position-absolute bottom-0 start-0 w-100 bg-white border-top rounded-top-4 shadow-lg p-3"
+          style={{ zIndex: 700, transform: `translateY(${mobileSheetY}px)`, transition: sheetDrag.current ? "none" : "transform 220ms ease", touchAction: "none" }}
+          onTouchStart={startSheetDrag}
+          onTouchMove={moveSheetDrag}
+          onTouchEnd={endSheetDrag}
+          onPointerDown={startSheetDrag}
+          onPointerMove={moveSheetDrag}
+          onPointerUp={endSheetDrag}
+        >
+          <button type="button" className="btn border-0 w-100 p-0 mb-2" onClick={() => { setMobileSheetOpen(!mobileSheetOpen); setMobileSheetY(mobileSheetOpen ? 220 : 0); }} aria-label="Move navigation options">
+            <span className="d-block mx-auto" style={{ width: 42, height: 5, borderRadius: 999, background: "var(--color-border-strong)" }} />
+          </button>
           <Controls />
         </div>
       </div>}
