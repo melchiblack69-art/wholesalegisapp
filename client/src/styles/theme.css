@@ -296,6 +296,37 @@ h1, h2, h3, .font-display {
   font-family: "Inter", sans-serif !important;
 }
 
+.navigation-live-dot {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  animation: navigation-live-pulse 1.5s ease-in-out infinite;
+}
+
+.navigation-accuracy-circle {
+  animation: navigation-accuracy-pulse 1.8s ease-in-out infinite;
+}
+
+.navigation-route-flow {
+  animation: navigation-route-flow 2.8s linear infinite;
+}
+
+@keyframes navigation-route-flow {
+  to { stroke-dashoffset: -38px; }
+}
+
+@keyframes navigation-live-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.72; }
+}
+
+@keyframes navigation-accuracy-pulse {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.24; }
+}
+
 .company-map-icon span,
 .user-map-icon span { display:flex; align-items:center; justify-content:center; width:34px; height:34px; border:3px solid #fff; border-radius:50%; color:#fff; box-shadow:var(--shadow-md); font-size:17px; }
 .user-map-icon span { position:relative; width:30px; height:30px; background:#2f6fed; }

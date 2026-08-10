@@ -81,22 +81,15 @@ export function useGraphHopperRoute({ origin, destination, mode, enabled }) {
   return useQuery({
     queryKey: ["graphhopper-route", roundedOrigin, roundedDestination, mode],
     queryFn: async () => {
-      const key = import.meta.env.VITE_GRAPHHOPPER_API_KEY;
-      if (!key) throw new Error("GraphHopper API key is not configured");
-      const params = new URLSearchParams({
-        profile: mode === "driving" ? "car" : mode === "cycling" ? "bike" : "foot",
-        points_encoded: "false",
-        instructions: "true",
-        key,
+      const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/route`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin: roundedOrigin, destination: roundedDestination, mode }),
       });
-      params.append("point", `${roundedOrigin[0]},${roundedOrigin[1]}`);
-      params.append("point", `${roundedDestination[0]},${roundedDestination[1]}`);
-      const response = await fetch(`https://graphhopper.com/api/1/route?${params}`);
       if (!response.ok) throw new Error("Unable to load route");
       const data = await response.json();
-      const path = data.paths?.[0];
-      if (!path) throw new Error("No route found");
-      return { points: path.points?.coordinates?.map(([lng, lat]) => [lat, lng]) || [], distance: path.distance, time: path.time, instructions: path.instructions || [] };
+      if (!data?.points?.length) throw new Error("No route found");
+      return data;
     },
     enabled: Boolean(enabled && roundedOrigin && roundedDestination),
     staleTime: 30 * 1000,

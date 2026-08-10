@@ -26,6 +26,20 @@ function distanceToRouteMeters(point, routePoints) {
   ));
 }
 
+function nearestRouteIndex(point, routePoints) {
+  if (!validPoint(point) || !Array.isArray(routePoints) || routePoints.length === 0) return 0;
+  let nearest = 0;
+  let best = Infinity;
+  routePoints.forEach((routePoint, index) => {
+    const distance = haversineDistance(point[0], point[1], routePoint[0], routePoint[1]);
+    if (distance < best) {
+      best = distance;
+      nearest = index;
+    }
+  });
+  return nearest;
+}
+
 // Destination pin — unchanged, still used for the company location
 function marker(color = "#e0405a") {
   return L.divIcon({
@@ -37,21 +51,19 @@ function marker(color = "#e0405a") {
 }
 
 function userMarker(mode, heading) {
-  const iconClass =
-    modes.find((m) => m.key === mode)?.icon || "bi-geo-alt-fill";
-  const color = "#1c6b41";
+  const color = "#4285f4";
   const wedge = Number.isFinite(heading)
     ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 29px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid ${color};opacity:1"></div>`
     : "";
   return L.divIcon({
     className: "directions-marker",
     html: `
-      <div style="position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;">
+      <div style="position:relative;width:38px;height:38px;display:flex;align-items:center;justify-content:center;">
         ${wedge}
-        <i class="bi ${iconClass}" style="color:${color};font-size:25px;text-shadow:0 1px 2px rgba(0,0,0,0.28);"></i>
+        <div class="navigation-live-dot" style="background:${color};"></div>
       </div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
   });
 }
 
@@ -71,6 +83,7 @@ export default function Directions() {
   const [heading, setHeading] = useState(null);
   const [locationWarning, setLocationWarning] = useState("");
   const [started, setStarted] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState(NIA_CENTER);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 991.98px)").matches);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -222,9 +235,23 @@ export default function Directions() {
     ? `${(route.distance / 1000).toFixed(1)} km · ${formatDuration(route.time)}`
     : "Route unavailable";
   const instructions = Array.isArray(route?.instructions) ? route.instructions : [];
-  const firstInstruction = instructions[0];
-  const instructionText = firstInstruction?.text || (started ? "Follow the route" : "Start navigation");
-  const instructionDistance = firstInstruction?.distance ? `${Math.round(firstInstruction.distance)} m` : "";
+  const routePositionIndex = nearestRouteIndex(origin, safeRoutePoints);
+  const currentInstruction = instructions.find((instruction) => {
+    const interval = instruction?.interval;
+    return Array.isArray(interval) && routePositionIndex >= interval[0] && routePositionIndex <= interval[1];
+  }) || instructions[0];
+  const instructionText = currentInstruction?.text || (started ? "Follow the route" : "Start navigation");
+  const instructionDistance = currentInstruction?.distance ? `${Math.round(currentInstruction.distance)} m` : "";
+
+  useEffect(() => {
+    if (!started || !voiceEnabled || !instructionText || !("speechSynthesis" in window)) return undefined;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(`${instructionText}. ${summary}.`);
+    utterance.rate = 0.95;
+    utterance.volume = 1;
+    window.speechSynthesis.speak(utterance);
+    return () => window.speechSynthesis.cancel();
+  }, [started, voiceEnabled, instructionText, summary]);
 
   if (isLoading) return <LoadingSpinner fullScreen />;
   if (isError || !company || !validDestination)
@@ -243,6 +270,7 @@ export default function Directions() {
         <button
           key={item.key}
           onClick={() => setMode(item.key)}
+          disabled={Boolean(routeError)}
           className="btn flex-fill rounded-3 d-flex flex-column align-items-center py-2"
           style={
             mode === item.key
@@ -285,11 +313,16 @@ export default function Directions() {
     <div className="position-relative" style={{ minHeight: 190 }}>
       <ModeSelector />
       <div className="d-flex align-items-center gap-2 rounded-3 p-2 mb-3" style={{ background: "var(--color-primary-light)", color: "var(--color-primary-dark)" }}>
-        <i className={`bi ${firstInstruction?.sign < 0 ? "bi-arrow-left" : firstInstruction?.sign > 0 ? "bi-arrow-right" : "bi-arrow-up"} fs-4`} />
+        <i className={`bi ${currentInstruction?.sign < 0 ? "bi-arrow-left" : currentInstruction?.sign > 0 ? "bi-arrow-right" : "bi-arrow-up"} fs-4`} />
         <div className="min-w-0">
           <div className="fw-semibold text-truncate">{instructionText}</div>
           {instructionDistance && <div className="small text-muted-brand">{instructionDistance}</div>}
         </div>
+        {started && "speechSynthesis" in window && (
+          <button type="button" className="btn btn-sm btn-light rounded-circle ms-auto flex-shrink-0" onClick={() => setVoiceEnabled((enabled) => !enabled)} aria-label={voiceEnabled ? "Mute voice guidance" : "Enable voice guidance"} title={voiceEnabled ? "Mute voice guidance" : "Enable voice guidance"}>
+            <i className={`bi ${voiceEnabled ? "bi-volume-up-fill" : "bi-volume-mute-fill"}`} />
+          </button>
+        )}
       </div>
       {locationWarning && (
         <div className="alert alert-warning py-2 small">{locationWarning}</div>
@@ -302,8 +335,8 @@ export default function Directions() {
       </div>
 
       {routeError && (
-        <div className="text-danger small mb-2">
-          Unable to load the route. Try an external map.
+        <div className="alert alert-danger py-2 small mb-2">
+          Route unavailable. Start navigation and route controls are disabled. Use an external map instead.
         </div>
       )}
 
@@ -319,7 +352,7 @@ export default function Directions() {
       <button
         className="btn btn-brand w-100 rounded-3 py-2 mb-2"
         onClick={() => setStarted(true)}
-        disabled={started}
+        disabled={started || Boolean(routeError)}
       >
         {started ? "Navigation Started" : "Start Navigation"}
       </button>
@@ -371,9 +404,9 @@ export default function Directions() {
             <span className="rounded-circle" style={{ width: 10, height: 10, background: "var(--color-primary)" }} />
             <span className="bg-white rounded-pill px-2 py-1 shadow-sm text-muted-brand small text-nowrap">My Location</span>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-geo-alt-fill text-danger" />
-            <span className="bg-white rounded-pill px-2 py-1 shadow-sm fw-medium small text-nowrap" style={{ maxWidth: "calc(100% - 28px)", overflow: "hidden", textOverflow: "ellipsis" }}>{company.name}</span>
+          <div className="d-flex align-items-center gap-2 w-100" style={{ minWidth: 0 }}>
+            <i className="bi bi-geo-alt-fill text-danger flex-shrink-0" />
+            <span className="bg-white rounded-pill px-2 py-1 shadow-sm fw-medium small d-block" style={{ minWidth: 0, maxWidth: "calc(100% - 28px)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{company.company_name}</span>
           </div>
         </div>
         <div className="position-absolute top-0 start-0 w-100 h-100" style={{ zIndex: 1 }}>
@@ -387,7 +420,7 @@ export default function Directions() {
             onClick={() => { setMobileSheetOpen(true); setMobileSheetY(0); }}
             aria-label="Open navigation instruction"
           >
-            <i className={`bi ${firstInstruction?.sign < 0 ? "bi-arrow-left" : firstInstruction?.sign > 0 ? "bi-arrow-right" : "bi-signpost-2"} me-1`} />
+            <i className={`bi ${currentInstruction?.sign < 0 ? "bi-arrow-left" : currentInstruction?.sign > 0 ? "bi-arrow-right" : "bi-signpost-2"} me-1`} />
             <span className="text-truncate" style={{ maxWidth: 220 }}>{instructionDistance ? `${instructionDistance} · ` : ""}{instructionText}</span>
           </button>
         )}

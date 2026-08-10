@@ -66,9 +66,13 @@ export default function NavigationMap({ height, initialCenter, origin, destinati
         <Marker position={safeOrigin} icon={userIcon(mode, heading)}>
           <Popup>{position ? "Your live location" : "North Industrial Area (fallback)"}</Popup>
         </Marker>
-        {position && Number.isFinite(Number(accuracy)) && <Circle center={safeOrigin} radius={Number(accuracy)} pathOptions={{ color: "#1c6b41", fillColor: "#1c6b41", fillOpacity: 0.08, weight: 1 }} />}
+        {position && Number.isFinite(Number(accuracy)) && <Circle className="navigation-accuracy-circle" center={safeOrigin} radius={Number(accuracy)} pathOptions={{ color: "#4285f4", fillColor: "#4285f4", fillOpacity: 0.12, weight: 2 }} />}
         {safeDestination && <Marker position={safeDestination} icon={destinationIcon(destinationColor)} />}
-        {safeRoutePoints.length > 1 && <Polyline positions={safeRoutePoints} pathOptions={{ color: "#2f6fed", weight: 5 }} />}
+        {safeRoutePoints.length > 1 && <>
+          <Polyline positions={safeRoutePoints} pathOptions={{ color: "#0b4fca", weight: 10, opacity: 0.28, lineCap: "round", lineJoin: "round" }} />
+          <Polyline positions={safeRoutePoints} pathOptions={{ color: "#4285f4", weight: 6, opacity: 0.96, lineCap: "round", lineJoin: "round" }} />
+          <Polyline positions={safeRoutePoints} pathOptions={{ color: "#d9e8ff", weight: 3, opacity: 0.9, dashArray: "1 18", lineCap: "round", className: "navigation-route-flow" }} />
+        </>}
         {position && <RecenterButton target={safeOrigin} />}
       </MapContainer>
     </div>
