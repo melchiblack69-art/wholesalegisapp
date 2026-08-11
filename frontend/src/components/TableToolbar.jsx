@@ -22,8 +22,8 @@ export default function TableToolbar({
         {filters}
       </div>
       {onAdd && (
-        <button className="btn btn-brand rounded-3 px-3 d-flex align-items-center gap-2 flex-shrink-0" onClick={onAdd}>
-          <i className="bi bi-plus-lg" /> <span>{addLabel}</span>
+        <button className="btn btn-outline-danger rounded-3 px-3 d-flex align-items-center gap-2 flex-shrink-0" onClick={onAdd}>
+          <i className="bi bi-trash" /> <span>{addLabel}</span>
         </button>
       )}
     </div>

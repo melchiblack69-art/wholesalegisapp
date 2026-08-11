@@ -1,4 +1,4 @@
-// routes/turf/turfImageRoute.js
+// routes/imageRoute.js
 const express = require('express');
 const router  = express.Router({ mergeParams: true }); // mergeParams to access :id from parent
 const adminAuth = require('../middleware/auth'); // your existing admin middleware
@@ -22,7 +22,7 @@ router.post('/',  upload.array('images', 10), uploadCompanyImages);
 router.put('/:imageId/cover', adminAuth,checkMaintenance, setCompanyCover);
 
 // DELETE /api/company/:id/images/:imageId — admin only, delete one image
-router.delete('/:imageId', adminAuth,checkMaintenance, deleteCompanyImage);
+router.delete('/:imageId', adminAuth, checkMaintenance, deleteCompanyImage);
 
 // DELETE /api/company/:id/images/:imageId — admin only, delete all images
 router.delete('/images/:imageId', adminAuth,checkMaintenance, deleteAllCompanyImages);

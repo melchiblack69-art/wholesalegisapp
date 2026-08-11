@@ -6,7 +6,7 @@ import { useState } from "react";
 
 const superAdminLinks = [
   { to: "/", label: "Dashboard", icon: "bi-speedometer2", end: true },
-  { to: "/companies", label: "Companies", icon: "bi-shop", end: false },
+  { to: "/companies", label: "Companies", icon: "bi-buildings", end: false },
   {
     to: "/categories",
     label: "Categories",
@@ -16,6 +16,7 @@ const superAdminLinks = [
   { to: "/map", label: "Map", icon: "bi-map-fill", end: false },
   { to: "/reports", label: "Reports", icon: "bi-bar-chart-fill", end: false },
   { to: "/users", label: "Users", icon: "bi-people-fill", end: false },
+  { to: "/contact", label: "Messages", icon: "bi-chat-left-text-fill", end: false },
   { to: "/settings", label: "Settings", icon: "bi-gear-fill", end: false },
 ];
 
@@ -23,7 +24,7 @@ const superAdminLinks = [
 // the full companies list, categories, other users, or system-wide reports.
 const companyLinks = [
   { to: "/", label: "Dashboard", icon: "bi-speedometer2", end: true },
-  { to: "/my-company", label: "My Warehouse", icon: "bi-shop", end: false },
+  { to: "/my-company", label: "My Warehouse", icon: "bi-buildings", end: false },
   {
     to: "/company/products/:id",
     label: "Products",

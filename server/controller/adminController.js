@@ -601,3 +601,13 @@ exports.getDashboardDetails = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+exports.getHelpMessages = async (req,res) =>{
+try {
+  const [message] =await db.query(`SELECT * FROM help`);
+ return res.json(message);
+} catch (error) {
+  console.log(`Get help error`, error);
+  return res.json({message: "Server error"});
+}
+};

@@ -20,6 +20,7 @@ import CompanyDetails from "./pages/CompanyDetails";
 import CompanyProducts from "./pages/CompanyProducts";
 import MaintenancePage from "./pages/Maintenance";
 import Register from "./pages/Register";
+import Help from "./pages/Help";
 
 function MyWarehouseRedirect() {
   const { user } = useAuth();
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="/map" element={<ProtectedRoute roles={["super_admin"]}><MapManage /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute roles={["super_admin"]}><Reports /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute roles={["super_admin"]}><Users /></ProtectedRoute>} />
+          <Route path="/contact" element={<ProtectedRoute roles={["super_admin"]}><Help /></ProtectedRoute>} />
           <Route path="/settings"  element={<Settings />} />
           <Route path="/company/:id/settings" element={<CompanySettings />} />
           <Route path="*" element={<Navigate to="/" replace />} />

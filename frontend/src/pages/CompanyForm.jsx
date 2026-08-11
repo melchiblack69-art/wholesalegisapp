@@ -197,7 +197,7 @@ export default function CompanyForm() {
 
     if (image?.id && !image.uploading) {
       try {
-        await api.del(`/api/company/${companyId}/images/${image.public_id || image.id}`);
+        await api.del(`/api/company/${companyId}/images/${image.id}`);
       } catch (error) {
         showModal(error.message || "Could not delete image.", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
@@ -214,7 +214,9 @@ export default function CompanyForm() {
     if (!companyId || images.length === 0) return;
 
     try {
-      await Promise.all(images.filter((image) => image.id || image.public_id).map((image) => api.del(`/api/company/${companyId}/images/${image.public_id || image.id}`)));
+      await Promise.all(images.filter((image) => image.id).map((image) =>
+  api.del(`/api/company/${companyId}/images/${image.id}`)
+));
       setImages([]);
       showModal("All images removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
@@ -228,7 +230,7 @@ export default function CompanyForm() {
     if (!image?.id || image.is_cover) return;
 
     try {
-      await api.put(`/api/company/${companyId}/images/${image.public_id || image.id}/cover`);
+        await api.put(`/api/company/${companyId}/images/${image.id}/cover`);
       setImages((prev) => prev.map((item) => ({ ...item, is_cover: item.id === image.id })));
       showModal("Cover image updated.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });

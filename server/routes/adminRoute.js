@@ -10,7 +10,8 @@ const {
   getAllAdmins,
   updateUser,
   deleteAdminPhoto,
-  changePassword
+  changePassword,
+  getHelpMessages
 } = require("../controller/adminController");
 const protect = require("../middleware/auth");
 const checkMaintenance = require("../middleware/checkMaintenance");
@@ -27,6 +28,7 @@ router.get("/company-name", protect, checkMaintenance, getCompanyName);
 router.get("/dashboard", protect, checkMaintenance,getDashboardDetails);
 router.get("/admins", protect, checkMaintenance, getAllAdmins);
 router.get("/companies", protect, checkMaintenance, getAllCompanies);
+router.get("/messages", protect, checkMaintenance, getHelpMessages);
 //DISPLAY TO COMPANY ADMINS
 router.get("/company-admins", protect, checkMaintenance, getAllCompanyAdmins);
 router.put("/update/:id", protect, checkMaintenance, upload.single("photo"), updateUser);
