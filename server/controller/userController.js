@@ -158,7 +158,7 @@ exports.login = async (req, res) => {
         role: user.role,
         photo: user.photo ?? null,
         phone: user.phone,
-        createdAt: user.created_at,
+        created_at: user.created_at,
         lastLogin: new Date(),
       },
     });
@@ -231,7 +231,7 @@ exports.updateUser = async (req, res) => {
 
     // ── 2. Verify user exists ─────────────────────────────────
     const [rows] = await db.query(
-      `SELECT id, name, email, phone, photo FROM users WHERE id = ? AND role = ? `,
+      `SELECT id, name, email, phone, photo, created_at FROM users WHERE id = ? AND role = ? `,
       [userId, "user"]
     );
 
@@ -280,7 +280,8 @@ exports.updateUser = async (req, res) => {
         phone,
         email,
         role,
-        photo
+        photo,
+        created_at
        FROM users
        WHERE id = ?`,
       [userId]

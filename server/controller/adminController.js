@@ -227,7 +227,7 @@ exports.updateUser = async (req, res) => {
     if (req.file) {
       const result = await uploadToCloudinary(
         req.file.buffer,
-        "gis/admins",
+        "gis_system/admins",
         `admin_${userId}_${Date.now()}`,
       );
       newPhotoUrl = result.secure_url;
@@ -286,7 +286,7 @@ exports.uploadAdminPhoto = async (req, res) => {
     // Upload new photo
     const result = await uploadToCloudinary(
       req.file.buffer,
-      "gis/admins",
+      "gis_system/admins",
       `admin_${userId}_${Date.now()}`,
     );
 

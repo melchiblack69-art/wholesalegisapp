@@ -9,6 +9,7 @@ const {
   uploadCompanyImages,
   setCompanyCover,
   deleteCompanyImage,
+  deleteAllCompanyImages
 } = require('../controller/imageController');
 
 // GET /api/company/:id/images — public, anyone can view
@@ -22,5 +23,8 @@ router.put('/:imageId/cover', adminAuth,checkMaintenance, setCompanyCover);
 
 // DELETE /api/company/:id/images/:imageId — admin only, delete one image
 router.delete('/:imageId', adminAuth,checkMaintenance, deleteCompanyImage);
+
+// DELETE /api/company/:id/images/:imageId — admin only, delete all images
+router.delete('/images/:imageId', adminAuth,checkMaintenance, deleteAllCompanyImages);
 
 module.exports = router;

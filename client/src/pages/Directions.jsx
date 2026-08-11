@@ -434,7 +434,7 @@ export default function Directions() {
           >
             <i className="bi bi-signpost-2 me-1" />
             Start Navigation
-          </button>
+       </button>
         )}
         <div
           className="position-absolute bottom-0 start-0 w-100 bg-white border-top rounded-top-4 shadow-lg p-3"
