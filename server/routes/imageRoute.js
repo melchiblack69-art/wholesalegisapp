@@ -25,6 +25,6 @@ router.put('/:imageId/cover', adminAuth,checkMaintenance, setCompanyCover);
 router.delete('/:imageId', adminAuth, checkMaintenance, deleteCompanyImage);
 
 // DELETE /api/company/:id/images/:imageId — admin only, delete all images
-router.delete('/images/:imageId', adminAuth,checkMaintenance, deleteAllCompanyImages);
+// Company-wide image deletion is handled by the company deletion flow.
 
 module.exports = router;

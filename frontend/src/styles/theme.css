@@ -115,7 +115,7 @@ h1, h2, h3, .font-display {
   display: flex;
   align-items: center;
   gap: 20px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.86);
   border: none;
   border-top: 1px solid rgba(255,255,255,0.08);
   color: var(--sidebar-text);
@@ -678,15 +678,15 @@ h1, h2, h3, .font-display {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 4px dotted var(--color-primary);
+  border: 4px dotted #aeb0b2;
   animation: brand-spin 0.9s linear infinite;
 }
 .brand-spinner-logo {
   width: 42%;
   height: 42%;
   border-radius: 50%;
-  background: var(--color-primary);
-  color: #fff;
+  background: transparent;
+  color: #aeb0b2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -701,8 +701,9 @@ h1, h2, h3, .font-display {
 .brand-spinner-label {
   margin: 0;
   font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  letter-spacing: 0.16em;
+  font-weight: 500;
+  color: #aeb0b2;
 }
 
 @keyframes brand-spin { to { transform: rotate(360deg); } }

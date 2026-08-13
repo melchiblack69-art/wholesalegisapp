@@ -268,7 +268,11 @@ export default function CompanyDetails() {
       }
     }
 
-    setImages((prev) => prev.filter((item) => item.key !== image.key && item.id !== image.id));
+    setImages((prev) => prev.filter((item) => {
+      const sameId = image.id != null && item.id === image.id;
+      const sameKey = image.key != null && item.key === image.key;
+      return !sameId && !sameKey;
+    }));
     showModal("Image removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
   };
