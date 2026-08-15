@@ -19,6 +19,7 @@ export default function Help() {
   const { showModal } = useModal();
   const [message, setMessage] = useState("");
   const [previewItem, setPreviewItem] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchHelpMessages = async () => {
     try {
@@ -33,6 +34,26 @@ export default function Help() {
         confirmText: false,
       });
     }
+  };
+
+  const deleteMessage = async (item) => {
+    if (!item?.id || !window.confirm("Delete this message?")) return;
+    try {
+      await api.del(`/api/auth/messages/${item.id}`);
+      setHelp((items) => items.filter((entry) => entry.id !== item.id));
+      setPreviewItem(null);
+    } catch (error) { showModal(error.message || "Could not delete message.", { type: "error", title: "Delete failed" }); }
+  };
+
+  const deleteAll = async () => {
+    if (!help.length || !window.confirm("Delete all contact messages?")) return;
+    setDeleting(true);
+    try {
+      await api.del("/api/auth/messages");
+      setHelp([]);
+      showModal("All contact messages deleted.", { type: "success", title: "Messages deleted", autoClose: true, confirmText: false });
+    } catch (error) { showModal(error.message || "Could not delete messages.", { type: "error", title: "Delete failed" }); }
+    finally { setDeleting(false); }
   };
 
   useEffect(() => {
@@ -71,24 +92,18 @@ export default function Help() {
 
       <div className="p-3 p-lg-4">
         <div className="card-surface p-0">
+
           <TableToolbar
             search={q}
             onSearchChange={setQ}
             searchPlaceholder="Search name or email..."
             addLabel="Delete All"
-            onAdd={() => {}}
+            onAdd={deleteAll}
+            addIcon="bi-trash3"
+            addClassName="btn btn-outline-danger rounded-3 px-3 d-flex align-items-center gap-2 flex-shrink-0"
           />
-          {message && (
-            <p
-              className={`mt-3 mb-0 ${
-                message.toLowerCase().includes("success")
-                  ? "text-success"
-                  : "text-danger"
-              }`}
-            >
-              {message}
-            </p>
-          )}
+          
+         
           <div className="table-responsive">
             <table className="table admin-table mb-0">
               <thead>
@@ -97,7 +112,7 @@ export default function Help() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Message</th>
-                  <th>Created At</th>
+                  <th>Received On</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -132,8 +147,8 @@ export default function Help() {
                         >
                           <i className="bi bi-eye" style={{ color: "var(--color-primary)" }} />
                         </button>
-                        <button className="btn btn-sm border-0 p-1" title="Delete">
-                          <i className="bi bi-trash" style={{ color: "var(--color-danger)" }} />
+                        <button className="btn btn-sm border-0 p-1" title="Delete" onClick={() => deleteMessage(h)} disabled={deleting}>
+                          <i className="bi bi-trash3" style={{ color: "var(--color-danger)" }} />
                         </button>
                       </div>
                     </td>
@@ -175,9 +190,13 @@ export default function Help() {
                 <i className="bi bi-x-lg" />
               </button>
             </div>
-            <p className="text-muted-brand mb-3" style={{ whiteSpace: "pre-wrap" }}>
+            <p className="text-body mb-3 p-3 rounded-3" style={{ whiteSpace: "pre-wrap", background: "var(--color-primary-soft)", lineHeight: 1.65 }}>
               {previewItem.message}
             </p>
+            <div className="d-flex justify-content-end gap-2">
+              <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => deleteMessage(previewItem)}><i className="bi bi-trash3 me-1" />Delete</button>
+              <button type="button" className="btn btn-brand btn-sm" onClick={() => setPreviewItem(null)}>Close</button>
+            </div>
             <p className="text-muted-brand mb-0" style={{ fontSize: "0.78rem" }}>
               {previewItem.created_at
                 ? new Date(previewItem.created_at).toLocaleString()

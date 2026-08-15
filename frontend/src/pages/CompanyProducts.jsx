@@ -7,6 +7,27 @@ import { api } from "../api/client";
 import { publicId } from "../utils/publicId";
 import { useModal } from "../context/ModalContext";
 
+function dateHelper(value) {
+  if (!value) return "";
+
+  // MySQL returns timestamps as `YYYY-MM-DD HH:mm:ss`, which is not
+  // consistently parsed by all browsers. Convert it to an ISO-like value
+  // before creating the Date object.
+  const normalized = typeof value === "string"
+    ? value.trim().replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s+/, "$1T")
+    : value;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "numeric"
+  });
+}
+
 
 export default function CompanyProducts() {
   const { openSidebar } = useSidebar();
@@ -93,7 +114,7 @@ export default function CompanyProducts() {
             product_name: form.product_name,
             quantity: Number(form.quantity || 0),
             unit: form.unit,
-            added_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
           },
         ]);
       }
@@ -109,9 +130,9 @@ export default function CompanyProducts() {
   const remove = async (productId) => {
     try {
       await api.del(`/api/company/products/${publicId(products.find((p) => p.id === productId)) || productId}`);
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      setProducts((prev) => prev.filter((p) => String(publicId(p)) !== String(productId)));
       setConfirmDeleteId(null);
-      showModal("Product removed.", { type: "info", title: "Info", 
+      showModal("Product removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } catch (error) {
       showModal(error.message || "Could not delete product.", { type: "error",
@@ -145,7 +166,7 @@ export default function CompanyProducts() {
                   <th>Product Name</th>
                   <th>Quantity</th>
                   <th>Unit</th>
-                  <th>Added At</th>
+                  <th>Added On</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -170,18 +191,12 @@ export default function CompanyProducts() {
                   </tr>
                 ) : (
                   filtered.map((c, i) => (
-                    <tr key={c.id}>
+                    <tr key={publicId(c)}>
                       <td className="text-muted-brand">{i + 1}</td>
                       <td className="fw-medium">{c.product_name}</td>
                       <td className="text-muted-brand">{c.quantity}</td>
                       <td className="text-muted-brand">{c.unit}</td>
-                      <td className="text-muted-brand">
-                        {c.created_at
-                          ? new Date(c.created_at).toLocaleDateString() +
-                            " " +
-                            new Date(c.created_at).toLocaleTimeString()
-                          : "-"}
-                      </td>
+                      <td className="text-muted-brand">{dateHelper(c.created_at)|| "-"}</td>
                       <td>
                         <div className="d-flex align-items-center gap-2">
                           <button
@@ -189,15 +204,15 @@ export default function CompanyProducts() {
                             onClick={() => openEdit(c)}
                             title="Edit"
                           >
-                            <i className="bi bi-pencil text-primary-brand" />
+                            <i className="bi bi-pencil-square text-primary-brand" />
                           </button>
                           <button
                             className="btn btn-sm border-0 p-1"
-                            onClick={() => setConfirmDeleteId(c.id)}
+                            onClick={() => setConfirmDeleteId(publicId(c))}
                             title="Delete"
                           >
                             <i
-                              className="bi bi-trash"
+                              className="bi bi-trash3"
                               style={{ color: "var(--color-danger)" }}
                             />
                           </button>
@@ -229,7 +244,7 @@ export default function CompanyProducts() {
               {editing ? "Edit Product" : "Add Product"}
             </p>
             <div className="mb-3">
-              <label className="form-label">Product Name *</label>
+              <label className="form-label">Product Name <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
               <input
                 required
                 className="form-control"
@@ -241,7 +256,7 @@ export default function CompanyProducts() {
               />
             </div>
             <div className="mb-4">
-              <label className="form-label">Quantity *</label>
+              <label className="form-label">Quantity <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
               <input
                 required
                 className="form-control"
@@ -254,7 +269,7 @@ export default function CompanyProducts() {
               />
             </div>
             <div className="mb-4">
-              <label htmlFor="unit">Unit *</label>
+              <label htmlFor="unit">Unit <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
               <select 
                className="form-control"
                 type="text"

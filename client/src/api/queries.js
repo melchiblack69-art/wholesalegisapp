@@ -64,7 +64,7 @@ export function useAccraLocationSuggestions(query) {
   return useQuery({
     queryKey: ["accra-location-suggestions", normalizedQuery.toLowerCase()],
     queryFn: async () => {
-      const params = new URLSearchParams({ format: "jsonv2", addressdetails: "1", limit: "5", countrycodes: "gh", bounded: "1", viewbox: "-0.55,5.85,0.35,5.45", q: `${normalizedQuery}, Accra, Ghana` });
+      const params = new URLSearchParams({ format: "jsonv2", addressdetails: "1", limit: "5", countrycodes: "gh", q: `${normalizedQuery}, Ghana` });
       const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error("Location search failed");
       const rows = await response.json();
@@ -94,7 +94,8 @@ export function useGraphHopperRoute({ origin, destination, mode, enabled }) {
     enabled: Boolean(enabled && roundedOrigin && roundedDestination),
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
-    retry: 1,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(4000, 700 * (attempt + 1)),
     placeholderData: (previous) => previous,
   });
 }

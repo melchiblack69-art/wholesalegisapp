@@ -43,9 +43,14 @@ export function SystemSettingsProvider({ children }) {
   };
 
   window.addEventListener("focus", handleFocus);
+  const handleSettingsChanged = () => { refetch(); };
+  window.addEventListener("system-settings-updated", handleSettingsChanged);
+  window.addEventListener("systemSettingsChanged", handleSettingsChanged);
 
   return () => {
     window.removeEventListener("focus", handleFocus);
+    window.removeEventListener("system-settings-updated", handleSettingsChanged);
+    window.removeEventListener("systemSettingsChanged", handleSettingsChanged);
   };
 }, [refetch]);
 

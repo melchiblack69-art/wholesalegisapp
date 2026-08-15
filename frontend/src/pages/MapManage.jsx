@@ -41,8 +41,7 @@ export default function MapManage() {
         setCategoryRows(unique);
         setActiveCats(unique.map((c) => c.id));
       } catch (error) {
-      showModal(error.message || "Could not load map companies.", 
-          { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2000, confirmText: false });
+       setMessage(error.message || "Could not load data.")
       } finally {
         setLoading(false);
       }
@@ -87,7 +86,7 @@ export default function MapManage() {
                 <label className="form-check-label" htmlFor="all-layers">All Companies</label>
               </div>
               {categoryRows.map((c) => (
-                <div className="form-check mb-2" key={c.id}>
+                <div className="form-check mb-2" key={c.public_id || c.id}>
                   <input className="form-check-input" type="checkbox" id={`layer-${c.id}`} checked={activeCats.includes(c.id)} onChange={() => toggleCat(c.id)} />
                   <label className="form-check-label" htmlFor={`layer-${c.id}`}>{c.name}</label>
                 </div>
@@ -95,7 +94,7 @@ export default function MapManage() {
 
               <p className="fw-semibold mt-4 mb-2" style={{ fontSize: "0.9rem" }}>Legend</p>
               {categoryRows.map((c, index) => (
-                <div className="d-flex align-items-center gap-2 mb-2" key={c.id}>
+                <div className="d-flex align-items-center gap-2 mb-2" key={c.public_id || c.id}>
                   <span style={{ width: 12, height: 12, borderRadius: "50%", background: c.category_color, display: "inline-block" }} />
                   <span style={{ fontSize: "0.85rem" }}>{c.name}</span>
                 </div>

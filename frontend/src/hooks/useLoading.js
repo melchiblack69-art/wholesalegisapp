@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { showGlobalLoading, hideGlobalLoading } from "../util/loadBus";
+import { showGlobalLoading, hideGlobalLoading } from "../utils/loadBus";
 
 export function useLoading() {
   const showLoading = useCallback((label) => showGlobalLoading(label), []);

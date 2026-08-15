@@ -19,7 +19,7 @@ router.get('/',                        getCompanyImages);
 router.post('/',  upload.array('images', 10), uploadCompanyImages);
 
 // PUT /api/company/:id/images/:imageId/cover — admin only, set cover image
-router.put('/:imageId/cover', adminAuth,checkMaintenance, setCompanyCover);
+router.put('/:imageId/cover', adminAuth, checkMaintenance, setCompanyCover);
 
 // DELETE /api/company/:id/images/:imageId — admin only, delete one image
 router.delete('/:imageId', adminAuth, checkMaintenance, deleteCompanyImage);

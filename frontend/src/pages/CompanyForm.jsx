@@ -7,14 +7,14 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 import { useModal } from "../context/ModalContext";
 
-const COMPANY_MANAGEMENT_ROLES = ["super_admin", "warehouse_manager", "warehouse_user"];
-
 function parseProducts(value = "") {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
+
+const COMPANY_MANAGEMENT_ROLES = ["warehouse_manager", "warehouse_user"];
 
 export default function CompanyForm() {
   const { showModal } = useModal();
@@ -30,15 +30,6 @@ export default function CompanyForm() {
   const [categories, setCategories] = useState([]);
   const [loadingCompany, setLoadingCompany] = useState(Boolean(id));
 
-  // A "company" account may only ever edit its own linked company record.
-  const isOwnCompany = user?.role === "super_admin" || (COMPANY_MANAGEMENT_ROLES.includes(user?.role) && String(user.companyId) === String(companyId));
-
-  useEffect(() => {
-    if ((isEdit || location.pathname === "/my-company") && user && !isOwnCompany) {
-      navigate("/my-company", { replace: true });
-    }
-  }, [isEdit, user, isOwnCompany, navigate]);
-
   const [form, setForm] = useState({
     name: "",
     category: "",
@@ -53,26 +44,13 @@ export default function CompanyForm() {
   const [editableFields, setEditableFields] = useState({});
 
   useEffect(() => {
-    api.get("/api/auth/companies")
-      .then((rows) => {
-        const categoryMap = new Map();
-        (Array.isArray(rows) ? rows : []).forEach((company) => {
-          const id = company.category_id || company.cat_id;
-          const name = company.category_name;
-          if (id && name && !categoryMap.has(String(id))) categoryMap.set(String(id), { id, category_name: name });
-        });
-        setCategories(Array.from(categoryMap.values()));
-      })
+    api.get("/api/company/categories")
+      .then((rows) => setCategories(Array.isArray(rows) ? rows : []))
       .catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {
     if (!companyId || !user) return;
-
-    if (!isOwnCompany) {
-      navigate("/my-company", { replace: true });
-      return;
-    }
 
     let ignore = false;
     setLoadingCompany(true);
@@ -112,7 +90,7 @@ export default function CompanyForm() {
     return () => {
       ignore = true;
     };
-  }, [companyId, isEdit, isOwnCompany, user?.id, user?.role, user?.companyId, navigate, location.pathname]);
+  }, [companyId, isEdit, user?.id, user?.role, user?.companyId]);
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const isCreateMode = !isEdit;
@@ -273,9 +251,11 @@ export default function CompanyForm() {
 
       showModal("Company Information Saved.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
-      setTimeout(() => navigate(COMPANY_MANAGEMENT_ROLES.includes(user?.role) ? "/my-company" : "/companies"), 3000);
+        setTimeout(() =>{ 
+        navigate("/companies");
+      },2500);
     } catch (error) {
-      showModal(error.message || "Could not save company.", { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2000, confirmText: false });
+      showModal(error.message || "Could not save company info.", { type: "error", title: "Error", autoClose: true, autoCloseDelay: 2000, confirmText: false });
     }
   };
 
@@ -283,8 +263,7 @@ export default function CompanyForm() {
     ? companyDetails.products.map((product) => product.product_name || product.name || product).filter(Boolean)
     : parseProducts(form.products);
 
-  if (isEdit && !COMPANY_MANAGEMENT_ROLES.includes(user?.role) && user?.role !== "super_admin") return null;
-
+ 
   return (
     <>
       <Topbar
@@ -301,7 +280,7 @@ export default function CompanyForm() {
                 <p className="fw-semibold mb-3">Company Information</p>
                 <div className="row g-3">
                   <div className="col-sm-6">
-                    <label className="form-label">Company Name *</label>
+                    <label className="form-label">Company Name <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <input required className="form-control" placeholder="Enter company name" value={form.name} onChange={update("name")} disabled={!canEditField("name")} />
                       {!isCreateMode && (
@@ -312,7 +291,7 @@ export default function CompanyForm() {
                     </div>
                   </div>
                   <div className="col-sm-6">
-                    <label className="form-label">Category *</label>
+                    <label className="form-label">Category <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <select required className="form-select" value={form.category} onChange={update("category")} disabled={!canEditField("category")}>
                         <option value="">Select category</option>
@@ -331,7 +310,7 @@ export default function CompanyForm() {
                     )}
                   </div>
                   <div className="col-sm-6">
-                    <label className="form-label">Phone *</label>
+                    <label className="form-label">Phone <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <input required className="form-control" placeholder="Enter phone number" value={form.phone} onChange={update("phone")} disabled={!canEditField("phone")} />
                       {!isCreateMode && (
@@ -353,7 +332,7 @@ export default function CompanyForm() {
                     </div>
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Address *</label>
+                    <label className="form-label">Address <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <input required className="form-control" placeholder="Enter full address" value={form.address} onChange={update("address")} disabled={!canEditField("address")} />
                       {!isCreateMode && (
@@ -455,7 +434,7 @@ export default function CompanyForm() {
                 />
 
                 {images.length > 0 && (
-                  <div className="d-flex justify-content-end mb-2">
+                  <div className="d-flex justify-content-end mb-1 mt-1">
                     <button type="button" className="btn btn-sm btn-outline-danger" onClick={deleteAllImages}>
                       <i className="bi bi-trash3 me-1" /> Delete all
                     </button>

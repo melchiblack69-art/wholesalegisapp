@@ -8,6 +8,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/AuthContext";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 
 export default function AdminDashboard() {
   const { openSidebar } = useSidebar();
@@ -69,16 +70,16 @@ export default function AdminDashboard() {
       <div className="p-3 p-lg-4">
         <div className="row g-3 mb-4">
           <div className="col-6 col-lg-3">
-            <StatCard icon="bi-building" label="Total Companies" value={stats.total_companies ?? 0} delta="Live data" />
+            <StatCard icon="bi-buildings" label="Total Companies" value={stats.total_companies ?? 0}  />
           </div>
           <div className="col-6 col-lg-3">
-            <StatCard icon="bi-check-circle-fill" label="Active Companies" value={activeCount} delta={`${activePct}%`} color="#1f9d55" bg="#e7f7ef" />
+            <StatCard icon="bi-check-circle-fill" label="Active Companies" value={activeCount}  color="#1f9d55" bg="#e7f7ef" />
           </div>
           <div className="col-6 col-lg-3">
-            <StatCard icon="bi-grid-3x3-gap-fill" label="Categories" value={stats.total_categories ?? 0} delta="Live data" color="#2f6fed" bg="#e9f0ff" />
+            <StatCard icon="bi-grid-3x3-gap-fill" label="Categories" value={stats.total_categories ?? 0}  color="#2f6fed" bg="#e9f0ff" />
           </div>
           <div className="col-6 col-lg-3">
-            <StatCard icon="bi-people-fill" label="Total Users" value={stats.total_users ?? 0} delta="Live data" color="#7a5cd6" bg="#f0ecfd" />
+            <StatCard icon="bi-people-fill" label="Total Users" value={stats.total_users ?? 0}  color="#7a5cd6" bg="#f0ecfd" />
           </div>
         </div>
 
@@ -147,7 +148,7 @@ export default function AdminDashboard() {
                     <td colSpan={5} className="text-center text-muted-brand py-3">No recent companies yet.</td>
                   </tr>
                 ) : recent.map((c) => (
-                  <tr key={c.id}>
+                  <tr key={publicId(c)}>
                     <td className="fw-medium">{c.company_name || c.name}</td>
                     <td className="text-muted-brand">{c.category_name || "Uncategorized"}</td>
                     <td className="text-muted-brand">{c.phone}</td>

@@ -1,166 +1,167 @@
 import { Link } from "react-router-dom";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { useEffect, useState } from "react";
 import Topbar from "../components/Topbar";
 import StatCard from "../components/StatCard";
-import StatusBadge from "../components/StatusBadge";
-import AdminMap from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
-import { companies, TOTAL_COMPANIES } from "../data/companies";
-import { categories } from "../data/categories";
 import { useAuth } from "../context/AuthContext";
-import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { publicId } from "../utils/publicId";
 
 export default function WarehouseDashboard() {
   const { openSidebar } = useSidebar();
-  const [companyRows, setCompanyRows] = useState([]);
-  const [categoryRows, setCategoryRows] = useState([]);
-  const [stats, setStats] = useState({ total_companies: 0, total_categories: 0, total_products: 0, total_users: 0 });
-  const [loading, setLoading] = useState(true);
-  const [dashboardMessage, setDashboardMessage] = useState("");
-
-  const recent = [...companyRows].sort((a, b) => new Date(b.created_at || b.addedOn || 0) - new Date(a.created_at || a.addedOn || 0)).slice(0, 3);
-  const activeCount = companyRows.filter((c) => String(c.status).toLowerCase() === "active").length;
-  const activePct = companyRows.length ? ((activeCount / companyRows.length) * 100).toFixed(1) : "0.0";
-  const chartData = categoryRows.map((category) => ({ name: category.category_name || category.name, value: Number(category.company_count || 0), color: category.color || "#1c6b41", icon: category.icon || "bi-grid-fill" }));
-  const totalCatCompanies = chartData.reduce((s, d) => s + d.value, 0);
   const { user } = useAuth();
+  const [stats, setStats] = useState({
+    total_users: 0,
+    total_products: 0,
+    total_images: 0,
+    recent_products: [],
+  });
   const [companyName, setCompanyName] = useState("");
-  const isAdmin = user?.role === "super_admin";
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-
-        if (isAdmin) {
-          const [statsRes, companiesRes, categoriesRes] = await Promise.all([
-            api.get("/api/auth/dashboard"),
-            api.get("/api/auth/companies"),
-            api.get("/api/company/categories")
-          ]);
-
-          setStats(statsRes || {});
-          setCompanyRows(Array.isArray(companiesRes) ? companiesRes : []);
-          setCategoryRows(Array.isArray(categoriesRes) ? categoriesRes : []);
-        } else {
-          const categoriesRes = await api.get("/api/company/categories");
-          setStats({ total_companies: 0, total_categories: Array.isArray(categoriesRes) ? categoriesRes.length : 0, total_products: 0, total_users: 0 });
-          setCompanyRows([]);
-          setCategoryRows(Array.isArray(categoriesRes) ? categoriesRes : []);
-        }
-      } catch (error) {
-        setDashboardMessage(error.message || "Could not load dashboard data.");
-      } finally {
-        setLoading(false);
-      }
+    let active = true;
+    Promise.all([
+      api.get("/api/auth/company/stats"),
+      api.get("/api/auth/company-name"),
+    ])
+      .then(([statsData, companyData]) => {
+        if (!active) return;
+        setStats({
+          total_users: 0,
+          total_products: 0,
+          total_images: 0,
+          recent_products: [],
+          ...statsData,
+        });
+        setCompanyName(companyData?.company_name || "");
+      })
+      .catch((e) => {
+        if (active) setError(e.message || "Could not load dashboard data.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
     };
+  }, []);
 
-    if (!isAdmin) {
-      api.get("/api/auth/company-name").then((response) => setCompanyName(response.company_name)).catch(() => {});
-    }
-
-    loadDashboard();
-  }, [isAdmin]);
-
+  const products = Array.isArray(stats.recent_products)
+    ? stats.recent_products
+    : [];
   return (
     <>
-      <Topbar title="Dashboard" subtitle={isAdmin ? " Wholesale Locator Platform" : ` ${companyName}`} onMenuClick={openSidebar} />
-
-      <div className="p-3 p-lg-4">
+      <Topbar
+        title="Dashboard"
+        subtitle={companyName || user?.companyName || "Warehouse overview"}
+        onMenuClick={openSidebar}
+      />
+      <main className="p-3 p-lg-4">
+        {error && <div className="alert alert-danger">{error}</div>}
         <div className="row g-3 mb-4">
-          <div className="col-6 col-lg-3">
-            <StatCard icon="bi-building" label="Total Companies" value={stats.total_companies ?? 0} delta="Live data" />
+          <div className="col-6 col-lg-4">
+            <StatCard
+              icon="bi-box-seam-fill"
+              label="Total Products"
+              value={stats.total_products ?? 0}
+            
+            />
           </div>
-          <div className="col-6 col-lg-3">
-            <StatCard icon="bi-check-circle-fill" label="Active Companies" value={activeCount} delta={`${activePct}%`} color="#1f9d55" bg="#e7f7ef" />
+          <div className="col-6 col-lg-4">
+            <StatCard
+              icon="bi-people-fill"
+              label="Team Members"
+              value={stats.total_users ?? 0}
+              color="#7a5cd6"
+              bg="#f0ecfd"
+            />
           </div>
-          <div className="col-6 col-lg-3">
-            <StatCard icon="bi-grid-3x3-gap-fill" label="Categories" value={stats.total_categories ?? 0} delta="Live data" color="#2f6fed" bg="#e9f0ff" />
-          </div>
-          <div className="col-6 col-lg-3">
-            <StatCard icon="bi-people-fill" label="Total Users" value={stats.total_users ?? 0} delta="Live data" color="#7a5cd6" bg="#f0ecfd" />
+          <div className="col-6 col-lg-4">
+            <StatCard
+              icon="bi-images"
+              label="Company Images"
+              value={stats.total_images ?? 0}
+              color="#2f6fed"
+              bg="#e9f0ff"
+            />
           </div>
         </div>
-
-        <div className="row g-3 mb-4">
-          <div className="col-lg-5">
-            <div className="card-surface p-3 h-100">
-              <p className="fw-semibold mb-3">Companies by Category</p>
-              <div className="d-flex align-items-center">
-                <div style={{ width: 140, height: 140 }}>
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={chartData} dataKey="value" innerRadius={38} outerRadius={62} paddingAngle={2}>
-                        {chartData.map((d) => (
-                          <Cell key={d.name} fill={d.color} stroke="none" />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => `${v} companies`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex-fill ps-3">
-                  {chartData.map((d) => (
-                    <div key={`${d.name}-${d.value}`} className="d-flex align-items-center justify-content-between mb-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: d.color, display: "inline-block" }} />
-                        <i className={`bi ${d.icon} me-1`} style={{ color: d.color, fontSize: "0.9rem" }} />
-                        <span style={{ fontSize: "0.82rem" }}>{d.name}</span>
-                      </div>
-                      <span className="text-muted-brand" style={{ fontSize: "0.8rem" }}>
-                        {d.value} ({((d.value / totalCatCompanies) * 100).toFixed(1)}%)
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-lg-7">
-            <div className="card-surface p-3 h-100">
-              <p className="fw-semibold mb-3">Company Locations Overview</p>
-              {loading ? <div className="text-muted-brand">Loading dashboard map...</div> : <AdminMap companies={companyRows} height={230} zoom={13} />}
-            </div>
-          </div>
-        </div>
-
         <div className="card-surface p-3">
           <div className="d-flex align-items-center justify-content-between mb-2">
-            <p className="fw-semibold mb-0">Recent Added Companies</p>
-            <Link to="/companies" className="text-primary-brand fw-semibold" style={{ fontSize: "0.85rem" }}>View all</Link>
+            <div>
+              <p className="fw-semibold mb-1">Recently added products</p>
+              <p className="text-muted-brand small mb-0">
+                The latest products added to your company.
+              </p>
+            </div>
+            <Link
+              to={`/company/products/${user?.companyPublicId || user?.companyId}`}
+              className="text-primary-brand fw-semibold"
+              style={{ fontSize: "0.85rem" }}
+            >
+              View all
+            </Link>
           </div>
           <div className="table-responsive">
             <table className="table admin-table mb-0">
               <thead>
                 <tr>
-                  <th>Company Name</th>
-                  <th>Category</th>
-                  <th>Phone</th>
-                  <th>Added On</th>
-                  <th>Status</th>
+                  <th>#</th>
+                  <th>Product</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Added</th>
                 </tr>
               </thead>
               <tbody>
-                {recent.length === 0 && !loading ? (
+                {loading ? (
                   <tr>
-                    <td colSpan={5} className="text-center text-muted-brand py-3">No recent companies yet.</td>
+                    <td
+                      colSpan={5}
+                      className="text-center text-muted-brand py-4"
+                    >
+                      Loading products...
+                    </td>
                   </tr>
-                ) : recent.map((c) => (
-                  <tr key={c.id}>
-                    <td className="fw-medium">{c.company_name || c.name}</td>
-                    <td className="text-muted-brand">{c.category_name || "Uncategorized"}</td>
-                    <td className="text-muted-brand">{c.phone}</td>
-                    <td className="text-muted-brand">{new Date(c.created_at || c.addedOn || 0).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td>
-                    <td><StatusBadge status={c.status || "Active"} /></td>
+                ) : products.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="text-center text-muted-brand py-4"
+                    >
+                      No products have been added yet.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  products.map((product, index) => (
+                    <tr
+                      key={
+                        publicId(product) || `${product.product_name}-${index}`
+                      }
+                    >
+                      <td className="text-muted-brand">{index + 1}</td>
+                      <td className="fw-medium">
+                        {product.product_name || "Unnamed product"}
+                      </td>
+                      <td>{product.quantity ?? 0}</td>
+                      <td className="text-muted-brand">
+                        {product.unit || "—"}
+                      </td>
+                      <td className="text-muted-brand">
+                        {product.created_at
+                          ? new Date(product.created_at).toLocaleDateString()
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
-      </div>
+      </main>
     </>
   );
 }

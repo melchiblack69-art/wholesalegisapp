@@ -99,7 +99,7 @@ export default function Categories() {
   const remove = async (id) => {
     try {
       await api.del(`/api/company/categories/${publicId(categories.find((c) => c.id === id)) || id}`);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      setCategories((prev) => prev.filter((c) => String(publicId(c)) !== String(id)));
       setConfirmDeleteId(null);
     } catch (error) {
        showModal(error.message || "Could not delete  category.", { type: "error", title: "Error", 
@@ -146,7 +146,7 @@ export default function Categories() {
                     <td colSpan={6} className="text-center text-muted-brand py-4">No categories yet.</td>
                   </tr>
                 ) : filtered.map((c, i) => (
-                  <tr key={c.id}>
+                  <tr key={publicId(c)}>
                     <td className="text-muted-brand">{i + 1}</td>
                     <td className="fw-medium">{c.name}</td>
                     <td>
@@ -173,11 +173,11 @@ export default function Categories() {
                           onClick={() => openEdit(c)}
                           title="Edit"
                         >
-                          <i className="bi bi-pencil text-primary-brand" />
+                          <i className="bi bi-pencil-square text-primary-brand" />
                         </button>
                         <button
-                          className="btn btn-sm border-0 p-1"
-                          onClick={() => setConfirmDeleteId(c.id)}
+                          className="btn btn-sm border-0 p-2"
+                        onClick={() => setConfirmDeleteId(publicId(c))}
                           title="Delete"
                         >
                           <i
@@ -212,7 +212,7 @@ export default function Categories() {
               {editing ? "Edit Category" : "Add Category"}
             </p>
             <div className="mb-3">
-              <label className="form-label">Category Name *</label>
+              <label className="form-label">Category Name <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
               <input
                 required
                 className="form-control"

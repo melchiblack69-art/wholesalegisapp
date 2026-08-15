@@ -131,6 +131,7 @@ const uploadCompanyImages = async (req, res) => {
         redis.KEYS.company(company_id),
         redis.KEYS.companyImages(company_id),
       );
+      await redis.set(redis.KEYS.publicCatalogVersion, Date.now(), 24 * 60 * 60);
     }
     // ── Invalidate cache for this turf and the all-turfs list ─────────────
     console.log(
@@ -177,7 +178,8 @@ const setCompanyCover = async (req, res) => {
       redis.KEYS.company(company_id),
       redis.KEYS.companyImages(company_id),
     );
-    // ── Invalidate cache for this turf and the all-turfs list ─────────────
+    await redis.set(redis.KEYS.publicCatalogVersion, Date.now(), 24 * 60 * 60);
+    // ── Invalidate cache for this company and the all-company list ─────────────
     console.log(
       `[cache] Invalidated Images company=${company_id} image=${image_id} after update`,
     );
@@ -237,6 +239,7 @@ const deleteCompanyImage = async (req, res) => {
       redis.KEYS.company(company_id),
       redis.KEYS.companyImages(company_id),
     );
+    await redis.set(redis.KEYS.publicCatalogVersion, Date.now(), 24 * 60 * 60);
     console.log(
       `[cache] Invalidated Images company=${company_id} image=${image_id} after delete`,
     );

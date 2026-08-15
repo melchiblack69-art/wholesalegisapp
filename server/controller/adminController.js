@@ -34,8 +34,10 @@ exports.register = async (req, res) => {
     )
       return res.status(403).json({ message: "Not authorized" });
 
-    const company_id = req.auth?.company_id;
-    if (!company_id)
+    const company_id = req.auth?.role === "super_admin"
+      ? (req.body.company_id || null)
+      : req.auth?.company_id;
+    if (req.auth?.role !== "super_admin" && !company_id)
       return res.status(403).json({ message: "No company assigned" });
 
     const { name, username, phone, email, role, password } = req.body;
@@ -57,7 +59,7 @@ exports.register = async (req, res) => {
       const result = await uploadToCloudinary(
         req.file.buffer,
         "gis/admins",
-        `admin_${company_id}_${Date.now()}`,
+        `admin_${company_id || "global"}_${Date.now()}`,
       );
       photoUrl = result.secure_url;
     }
@@ -69,7 +71,7 @@ exports.register = async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,?)`,
       [
         newPublicId(),
-        req.auth.company_id,
+        company_id,
         name,
         username,
         phone,
@@ -80,7 +82,7 @@ exports.register = async (req, res) => {
       ],
     );
 
-    res.status(201).json({ message: "Registration successful" });
+    res.status(201).json({ message: "Account created successfully" });
   } catch (err) {
     console.error("register error:", err);
     res.status(500).json({ error: err.message });
@@ -98,8 +100,9 @@ exports.login = async (req, res) => {
     }
     // ── 1. Check Admin ──────────────────────────────────────────
     const [rows] = await db.query(
-      `SELECT id,public_id,company_id, name, email, username, phone, password, role, photo FROM users
-WHERE email = ? OR username = ? OR phone = ?
+      `SELECT u.id,u.public_id,u.company_id,c.public_id AS company_public_id,c.company_name, u.name, u.email, u.username, u.phone, u.password, u.role, u.photo FROM users u
+       LEFT JOIN companies c ON c.id = u.company_id
+WHERE u.email = ? OR u.username = ? OR u.phone = ?
 LIMIT 1`,
       [email, email, email],
     );
@@ -138,6 +141,8 @@ LIMIT 1`,
         email: admin.email,
         role: admin.role,
         company_id: admin.company_id,
+        company_public_id: admin.company_public_id,
+        company_name: admin.company_name,
         photo: admin.photo ?? null,
         username: admin.username,
         phone: admin.phone,
@@ -199,7 +204,7 @@ exports.changePassword = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = await resolveInternalId(db, "users", req.params?.id);
-    if (!userId || String(req.auth?.id) !== String(userId))
+    if (!userId || (req.auth?.role !== "super_admin" && String(req.auth?.id) !== String(userId)))
       return res
         .status(403)
         .json({ message: "You can only update your own profile" });
@@ -250,7 +255,7 @@ exports.updateUser = async (req, res) => {
 
     // Return updated admin so frontend can sync immediately
     const [updated] = await db.query(
-      `SELECT id, company_id, name,username, phone,
+      `SELECT id, public_id, company_id, name,username, phone,
               email, role, photo
        FROM users WHERE id = ?`,
       [userId],
@@ -301,7 +306,7 @@ exports.uploadAdminPhoto = async (req, res) => {
 
     // Return updated admin
     const [updated] = await db.query(
-      `SELECT id, company_id, name,username, phone,
+      `SELECT id, public_id, company_id, name,username, phone,
               email, role, photo
        FROM users WHERE id = ? LIMIT 1`,
       [userId],
@@ -344,7 +349,7 @@ exports.deleteAdminPhoto = async (req, res) => {
 
    // Return the updated results
     const [updated] = await db.query(
-      `SELECT id, company_id, name,username, phone,
+      `SELECT id, public_id, company_id, name,username, phone,
               email, role, photo
        FROM users WHERE id = ? LIMIT 1`,
       [userId],
@@ -361,7 +366,7 @@ exports.deleteAdminPhoto = async (req, res) => {
 /* ================= DELETE ADMIN (COMPANY) ========================================== */
 exports.deleteCompanyUser = async (req, res) => {
   try {
-    const targetId = req.params.id;
+    const targetId = await resolveInternalId(db, "users", req.params.id);
     const requesterId = req.auth?.id;
     const requesterRole = req.auth?.role;
     if (!requesterId)
@@ -375,11 +380,14 @@ exports.deleteCompanyUser = async (req, res) => {
         .json({ message: "Only managers and super admins can delete users" });
     }
 
-    const [rows] = await db.query("SELECT photo FROM users WHERE id = ?", [
+    const [rows] = await db.query("SELECT photo, company_id FROM users WHERE id = ?", [
       targetId,
     ]);
     if (rows.length === 0) {
       return res.status(404).json({ message: "User does not exist" });
+    }
+    if (requesterRole !== "super_admin" && String(rows[0].company_id) !== String(req.auth?.company_id)) {
+      return res.status(403).json({ message: "You can only delete users in your company" });
     }
     if (rows[0].photo) {
       await deleteFromCloudinary(extractPublicId(rows[0].photo));
@@ -398,9 +406,11 @@ exports.getAdminDetails = async (req, res) => {
     const userId = await resolveInternalId(db, "users", req.params.id);
     if (!userId) return res.status(404).json({ message: "Admin not found" });
     const [rows] = await db.query(
-      `SELECT id, company_id, name,username, phone,
-              email, role, photo, created_at
-       FROM users WHERE id = ?`,
+      `SELECT u.id, u.public_id, u.company_id, c.public_id AS company_public_id,
+              c.company_name, u.name, u.username, u.phone,
+              u.email, u.role, u.photo, u.created_at
+       FROM users u LEFT JOIN companies c ON c.id = u.company_id
+       WHERE u.id = ?`,
       [userId],
     );
     if (!rows.length)
@@ -416,7 +426,7 @@ exports.getAdminDetails = async (req, res) => {
 exports.getAllCompanyAdmins = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, company_id, name,username, phone,
+      `SELECT id, public_id, company_id, name,username, phone,
               email, role, photo, last_login, created_at
        FROM users WHERE company_id = ?`,
       [req.auth?.company_id],
@@ -424,6 +434,28 @@ exports.getAllCompanyAdmins = async (req, res) => {
     res.json(rows); // photos are already Cloudinary URLs or null
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+// Company-scoped user list. Super admins may request a specific company;
+// warehouse accounts may only request their own company.
+exports.getCompanyAdminsByCompany = async (req, res) => {
+  try {
+    const requestedCompanyId = await resolveInternalId(db, "companies", req.params.companyId);
+    if (!requestedCompanyId) return res.status(404).json({ message: "Company not found" });
+    const isSuperAdmin = req.auth?.role === "super_admin";
+    if (!isSuperAdmin && String(req.auth?.company_id) !== String(requestedCompanyId)) {
+      return res.status(403).json({ message: "You can only view users in your company" });
+    }
+    const [rows] = await db.query(
+      `SELECT id, public_id, company_id, name, username, phone, email, role, photo, last_login, created_at
+       FROM users WHERE company_id = ? ORDER BY name`,
+      [requestedCompanyId],
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("getCompanyAdminsByCompany error:", err);
+    res.status(500).json({ message: "Could not load company users" });
   }
 };
 
@@ -535,7 +567,7 @@ exports.getAllAdmins = async (req, res) => {
     if (req.auth?.role !== "super_admin")
       return res.status(403).json({ message: "Super admin access required" });
     const [rows] = await db.query(
-      `SELECT id, company_id, name,username, phone,
+      `SELECT id, public_id, company_id, name,username, phone,
               email, role, photo, created_at, last_login
        FROM users WHERE role IN ('super_admin', 'warehouse_manager', 'warehouse_user','user')`,
     );
@@ -549,8 +581,9 @@ exports.getAllAdmins = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, company_id, name, username, email, phone, role, photo
-       FROM users WHERE id = ?`,
+      `SELECT u.id, u.public_id, u.company_id, c.public_id AS company_public_id,
+              c.company_name, u.name, u.username, u.email, u.phone, u.role, u.photo
+       FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.id = ?`,
       [req.auth?.id],
     );
     if (!rows.length)
@@ -602,6 +635,40 @@ exports.getDashboardDetails = async (req, res) => {
   }
 };
 
+// ──Warehouse/Company Admin: dashboard stats ─────────────────────────────────────────────────
+exports.getCompanyDashboardStats = async (req, res) => {
+  try {
+    if (req.auth?.role !== "warehouse_manager" && req.auth?.role !== "warehouse_user") {
+      return res.status(403).json({ message: "Company admin access required" });
+    } 
+    const companyId = req.auth?.company_id;
+
+    const [rows] = await db.query(
+      `SELECT 
+        (SELECT COUNT(*) FROM users WHERE company_id = ?) AS total_users,
+        (SELECT COUNT(*) FROM products WHERE company_id = ?) AS total_products,
+        (SELECT COUNT(*) FROM company_images WHERE company_id = ?) AS total_images`,
+      [companyId, companyId, companyId]
+    );
+
+    const [recentProducts] = await db.query(
+      `SELECT p.public_id, p.product_name, p.quantity, p.unit,p.created_at
+       FROM products p
+       WHERE p.company_id = ?
+       ORDER BY p.id DESC
+       LIMIT 8`,
+      [companyId],
+    );
+
+    const payload = rows[0];
+    payload.recent_products = recentProducts;
+    res.json(payload);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 exports.getHelpMessages = async (req,res) =>{
 try {
   const [message] =await db.query(`SELECT * FROM help`);
@@ -610,4 +677,38 @@ try {
   console.log(`Get help error`, error);
   return res.json({message: "Server error"});
 }
+};
+
+exports.deleteHelpMessage = async (req, res) => {
+  try {
+    const [result] = await db.query("DELETE FROM help WHERE id = ?", [req.params.id]);
+    if (!result.affectedRows) return res.status(404).json({ message: "Message not found" });
+    return res.json({ message: "Message deleted" });
+  } catch (error) { console.error("Delete help error", error); return res.status(500).json({ message: "Server error" }); }
+};
+
+exports.deleteAllHelpMessages = async (req, res) => {
+  try { await db.query("DELETE FROM help"); return res.json({ message: "Messages deleted" }); }
+  catch (error) { console.error("Delete all help error", error); return res.status(500).json({ message: "Server error" }); }
+};
+
+exports.getReportData = async (req, res) => {
+  try {
+    const type = req.params.type;
+    let sql;
+    if (type === "category") {
+      sql = `SELECT cat.public_id, cat.category_name AS name, COUNT(c.id) AS company_count
+        FROM categories cat LEFT JOIN companies c ON c.category_id = cat.id
+        GROUP BY cat.id, cat.public_id, cat.category_name ORDER BY cat.category_name`;
+    } else if (type === "location") {
+      sql = `SELECT c.public_id, c.company_name AS name, c.address, c.latitude, c.longitude, c.status
+        FROM companies c ORDER BY c.company_name`;
+    } else {
+      sql = `SELECT c.public_id, c.company_name AS name, c.phone, c.email, c.address, c.status, cat.category_name AS category
+        FROM companies c LEFT JOIN categories cat ON cat.id = c.category_id`;
+      if (type === "inactive") sql += " WHERE LOWER(COALESCE(c.status, '')) NOT IN ('active', 'approved')";
+    }
+    const [rows] = await db.query(sql);
+    return res.json({ type, generatedAt: new Date().toISOString(), rows });
+  } catch (error) { console.error("Report error", error); return res.status(500).json({ message: "Could not generate report" }); }
 };

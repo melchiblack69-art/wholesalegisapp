@@ -7,6 +7,8 @@ import { haversineDistance } from "../utils/haversine";
 import { createKalmanPosition } from "../utils/kalmanPosition";
 import { NIA_CENTER } from "../components/CompanyMap";
 import NavigationMap from "../components/NavigationMap";
+import googleMapsLogo from "../assets/Google-Maps-Logo.png";
+import appleMapsLogo from "../assets/apple-maps-icon-logo.png";
 
 const modes = [
   { key: "driving", label: "Driving", icon: "bi-car-front-fill" },
@@ -23,6 +25,18 @@ function distanceToRouteMeters(point, routePoints) {
   return Math.min(...routePoints.map((routePoint) =>
     haversineDistance(point[0], point[1], routePoint[0], routePoint[1]) * 1000,
   ));
+}
+
+// GraphHopper can return a very dense geometry. Keeping a bounded display
+// geometry prevents Leaflet and the browser renderer from doing thousands of
+// coordinate operations on every GPS update.
+function compactRoutePoints(points, maxPoints = 700) {
+  if (!Array.isArray(points) || points.length <= maxPoints) return points || [];
+  const step = Math.ceil(points.length / maxPoints);
+  const compact = points.filter((_, index) => index % step === 0);
+  const last = points[points.length - 1];
+  if (compact[compact.length - 1] !== last) compact.push(last);
+  return compact;
 }
 
 function nearestRouteIndex(point, routePoints) {
@@ -52,7 +66,7 @@ function marker(color = "#e0405a") {
 function userMarker(mode, heading) {
   const color = "#4285f4";
   const wedge = Number.isFinite(heading)
-    ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 29px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid ${color};opacity:1"></div>`
+    ? `<div style="position:absolute;top:1px;left:50%;transform:translateX(-50%) rotate(${heading}deg);transform-origin:50% 100%;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:17px solid ${color};opacity:1"></div>`
     : "";
   return L.divIcon({
     className: "directions-marker",
@@ -103,6 +117,7 @@ export default function Directions() {
   const initialLocationCaptured = useRef(false);
   const kalman = useRef(createKalmanPosition());
   const routePointsRef = useRef([]);
+  const offRouteReadings = useRef(0);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 991.98px)");
@@ -190,6 +205,7 @@ export default function Directions() {
         if (Number.isFinite(coords.heading)) setHeading(coords.heading);
 
         const offRoute = distanceToRouteMeters([next.lat, next.lng], routePointsRef.current) > 50;
+        offRouteReadings.current = offRoute ? offRouteReadings.current + 1 : 0;
         if (
           started &&
           haversineDistance(
@@ -197,7 +213,7 @@ export default function Directions() {
             lastRouteOrigin.current[1],
             next.lat,
             next.lng,
-          ) >= 0.01 || offRoute
+          ) >= 0.01 || offRouteReadings.current >= 2
         ) {
           lastRouteOrigin.current = [next.lat, next.lng];
           setRouteOrigin([next.lat, next.lng]);
@@ -234,12 +250,14 @@ export default function Directions() {
   const appleUrl = `https://maps.apple.com/?saddr=${origin[0]},${origin[1]}&daddr=${destination?.[0]},${destination?.[1]}&dirflg=${mode === "walking" ? "w" : mode === "cycling" ? "b" : "d"}`;
   const safeRoutePoints = useMemo(
     () => (route?.mode === mode
-      ? route.points?.filter((point) => validPoint(point)).map((point) => point.map(Number)) || []
+      ? compactRoutePoints(route.points?.filter((point) => validPoint(point)).map((point) => point.map(Number)) || [])
       : []),
     [mode, route],
   );
   routePointsRef.current = safeRoutePoints;
   const activeRoute = route?.mode === mode ? route : null;
+  const hasUsableRoute = Boolean(activeRoute && safeRoutePoints.length > 1);
+  const routeUnavailable = Boolean(routeError && !hasUsableRoute);
   const summary = activeRoute
     ? `${(route.distance / 1000).toFixed(1)} km · ${formatDuration(route.time)}`
     : "Route unavailable";
@@ -251,18 +269,20 @@ export default function Directions() {
   }) || instructions[0];
   const instructionText = routeLoading
     ? ""
-    : currentInstruction?.text || (started ? "Follow the route" : "Start navigation");
+    : routeUnavailable
+      ? "Route unavailable"
+      : currentInstruction?.text || (started ? "Follow the route" : "Start navigation");
   const instructionDistance = currentInstruction?.distance ? `${Math.round(currentInstruction.distance)} m` : "";
 
   useEffect(() => {
-    if (!started || !voiceEnabled || !instructionText || !("speechSynthesis" in window)) return undefined;
+    if (!started || !voiceEnabled || routeLoading || routeUnavailable || !activeRoute || !currentInstruction?.text || !("speechSynthesis" in window)) return undefined;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(`${instructionText}. ${summary}.`);
     utterance.rate = 0.95;
     utterance.volume = 1;
     window.speechSynthesis.speak(utterance);
     return () => window.speechSynthesis.cancel();
-  }, [started, voiceEnabled, instructionText, summary]);
+  }, [started, voiceEnabled, routeLoading, routeUnavailable, activeRoute, currentInstruction, instructionText, summary]);
 
   if (isLoading) return <DirectionsSkeleton fullScreen />;
   if (isError || !company || !validDestination)
@@ -281,7 +301,7 @@ export default function Directions() {
         <button
           key={item.key}
           onClick={() => setMode(item.key)}
-          disabled={Boolean(routeError)}
+          disabled={Boolean(routeError && !hasUsableRoute)}
           className="btn flex-fill rounded-3 d-flex flex-column align-items-center py-2"
           style={
             mode === item.key
@@ -349,12 +369,12 @@ export default function Directions() {
 
       {routeError && (
         <div className="alert alert-danger py-2 small mb-2">
-          Route unavailable. Start navigation and route controls are disabled. Use an external map instead.
+          {hasUsableRoute ? "Route update failed. Keeping the last working route and retrying." : "Route unavailable. Use an external map instead."}
         </div>
       )}
 
       <p className="fw-bold mb-0">
-        {started && route ? summary : "Select Start Navigation to load route"}
+        {started && hasUsableRoute ? summary : routeUnavailable ? "Route unavailable" : "Select Start Navigation to load route"}
       </p>
 
       <p className="text-muted-brand small mb-3">
@@ -365,7 +385,7 @@ export default function Directions() {
       <button
         className="btn btn-brand w-100 rounded-3 py-2 mb-2"
         onClick={() => setStarted(true)}
-        disabled={started || Boolean(routeError)}
+        disabled={started || routeUnavailable}
       >
         {started ? "Navigation Started" : "Start Navigation"}
       </button>
@@ -377,23 +397,25 @@ export default function Directions() {
           Cancel Navigation
         </button>
       )}
-      {routeError && (
+      {routeUnavailable && (
         <div className="d-flex gap-2">
           <a
-            className="btn btn-outline-secondary flex-fill"
+            className="btn btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-2"
             href={mapsUrl}
             target="_blank"
             rel="noreferrer"
           >
-            <i className="bi bi-google me-1" /> Google Maps
+            <img src={googleMapsLogo} alt="" className="directions-external-logo directions-google-logo" />
+            <span>Google Maps</span>
           </a>
           <a
-            className="btn btn-outline-secondary flex-fill"
+            className="btn btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-2"
             href={appleUrl}
             target="_blank"
             rel="noreferrer"
           >
-            <i className="bi bi-apple me-1" /> Apple Maps
+            <img src={appleMapsLogo} alt="" className="directions-external-logo" />
+            <span>Apple Maps</span>
           </a>
         </div>
       )}

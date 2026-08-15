@@ -87,7 +87,7 @@ export default function Companies() {
   try {
     await api.del(`/api/company/del-company/${id}`);
 
-    setLocalCompanies((prev) => prev.filter((c) => c.id !== id));
+    setLocalCompanies((prev) => prev.filter((c) => String(publicId(c)) !== String(id)));
 
     if (page > 1 && pageRows.length === 1) {
       setPage((current) => current - 1);
@@ -183,7 +183,7 @@ showModal(
                 {pageRows.map((c, i) => {
                   const cat = categories.find((cc) => String(cc.id) === String(c.category));
                   return (
-                    <tr key={c.id}>
+                    <tr key={publicId(c)}>
                       <td className="text-muted-brand">{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
                       <td className="fw-medium">{c.name}</td>
                       <td style={{ color: c.category_color || cat?.color }}>{c.category_name || cat?.category_name || cat?.name || "Uncategorized"}</td>
@@ -193,12 +193,12 @@ showModal(
                       <td>
                         <div className="d-flex align-items-center gap-2">
                           <button className="btn btn-sm border-0 p-1" title="Edit" onClick={() => navigate(`/company/${publicId(c)}/edit`)}>
-                            <i className="bi bi-pencil text-primary-brand" />
+                            <i className="bi bi-pencil-square text-primary-brand" />
                           </button>
                           <Link className="btn btn-sm border-0 p-1" to={`/companies/${publicId(c)}`} title="View">
                             <i className="bi bi-eye text-muted-brand" />
                           </Link>
-                          <button className="btn btn-sm border-0 p-1" title="Delete" onClick={() => setConfirmDeleteId(c.id)}>
+                          <button className="btn btn-sm border-0 p-1" title="Delete" onClick={() => setConfirmDeleteId(publicId(c))}>
                             <i className="bi bi-trash" style={{ color: "var(--color-danger)" }} />
                           </button>
                         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import AdminMap, { NIA_CENTER } from "../components/AdminMap";
 import { useSidebar } from "../context/SidebarContext";
@@ -7,14 +7,14 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
 import { useModal } from "../context/ModalContext";
 
-const COMPANY_MANAGEMENT_ROLES = ["super_admin", "warehouse_manager", "warehouse_user"];
-
 function parseProducts(value = "") {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
+
+const COMPANY_MANAGEMENT_ROLES = ["warehouse_manager", "warehouse_user"];
 
 function parseWorkingHours(value) {
   if (!value) {
@@ -74,7 +74,6 @@ function formatTimeToAmPm(value) {
 export default function CompanyDetails() {
   const { openSidebar } = useSidebar();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -85,14 +84,6 @@ export default function CompanyDetails() {
   const [loadingCompany, setLoadingCompany] = useState(Boolean(id));
   const {showModal} = useModal();
 
-  // A "company" account may only ever edit its own linked company record.
-  const isOwnCompany = user?.role === "super_admin" || (COMPANY_MANAGEMENT_ROLES.includes(user?.role) && String(user.companyId) === String(companyId));
-
-  useEffect(() => {
-    if ((isEdit || location.pathname === "/my-company") && user && !isOwnCompany) {
-      navigate("/my-company", { replace: true });
-    }
-  }, [isEdit, user, isOwnCompany, navigate]);
 
   const [form, setForm] = useState({
     name: "",
@@ -117,11 +108,6 @@ export default function CompanyDetails() {
 
   useEffect(() => {
     if (!companyId || !user) return;
-
-    if (!isOwnCompany) {
-      navigate("/my-company", { replace: true });
-      return;
-    }
 
     let ignore = false;
     setLoadingCompany(true);
@@ -165,7 +151,7 @@ export default function CompanyDetails() {
     return () => {
       ignore = true;
     };
-  }, [companyId, isEdit, isOwnCompany, user?.id, user?.role, user?.companyId, navigate, location.pathname]);
+  }, [companyId, isEdit, user?.id, user?.role, user?.companyId]);
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -336,11 +322,11 @@ export default function CompanyDetails() {
         status: companyDetails?.status || "Active",
       });
 
-      showModal("Saved.", { type: "success", title: "Success", 
+      showModal("Company Information Saved.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
-      setTimeout(() => navigate(COMPANY_MANAGEMENT_ROLES.includes(user?.role) ? "/my-company" : "/companies"), 900);
+
     } catch (error) {
-      showModal(error.message || "Could not save company details.", { type: "error", title: "Error", 
+      showModal(error.message || "Could not save company info.", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     }
   };
@@ -349,7 +335,6 @@ export default function CompanyDetails() {
     ? companyDetails.products.map((product) => product.product_name || product.name || product).filter(Boolean)
     : parseProducts(form.products);
 
-  if (isEdit && !COMPANY_MANAGEMENT_ROLES.includes(user?.role) && user?.role !== "super_admin") return null;
 
   return (
     <>
@@ -367,7 +352,7 @@ export default function CompanyDetails() {
                 <p className="fw-semibold mb-3">Company Information</p>
                 <div className="row g-3">
                   <div className="col-sm-6">
-                    <label className="form-label">Company Name *</label>
+                    <label className="form-label">Company Name <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <input required className="form-control" placeholder="Enter company name" value={form.name} onChange={update("name")} disabled={!editableFields.name} />
                       <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => toggleFieldEdit("name")} title="Edit field">
@@ -376,7 +361,7 @@ export default function CompanyDetails() {
                     </div>
                   </div>
                   <div className="col-sm-6">
-                    <label className="form-label">Category *</label>
+                    <label className="form-label">Category <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <select required className="form-select" value={form.category} onChange={update("category")} disabled={!editableFields.category}>
                         <option value="">Select category</option>
@@ -393,7 +378,7 @@ export default function CompanyDetails() {
                     )}
                   </div>
                   <div className="col-sm-6">
-                    <label className="form-label">Phone *</label>
+                    <label className="form-label">Phone <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <input required className="form-control" placeholder="Enter phone number" value={form.phone} onChange={update("phone")} disabled={!editableFields.phone} />
                       <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => toggleFieldEdit("phone")} title="Edit field">
@@ -411,7 +396,7 @@ export default function CompanyDetails() {
                     </div>
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Address *</label>
+                    <label className="form-label">Address <i className="bi bi-asterisk text-danger" style={{fontSize: "0.6rem" }}></i></label>
                     <div className="input-group">
                       <input required className="form-control" placeholder="Enter full address" value={form.address} onChange={update("address")} disabled={!editableFields.address} />
                       <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => toggleFieldEdit("address")} title="Edit field">
@@ -595,7 +580,7 @@ export default function CompanyDetails() {
                 />
 
                 {images.length > 0 && (
-                  <div className="d-flex justify-content-end mb-2">
+                  <div className="d-flex justify-content-end mb-1 mt-2">
                     <button type="button" className="btn btn-sm btn-outline-danger" onClick={deleteAllImages}>
                       <i className="bi bi-trash3 me-1" /> Delete all
                     </button>

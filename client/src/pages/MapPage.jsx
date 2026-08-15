@@ -12,6 +12,8 @@ import { haversineDistance } from "../utils/haversine";
 import { formatDistance } from "../utils/distance";
 
 const EMPTY_MAP_ROWS = [];
+const MAX_SEARCH_RESULTS = 4;
+const NEARBY_RADIUS_KM = 5;
 
 export default function MapPage() {
 
@@ -50,6 +52,7 @@ export default function MapPage() {
   const selectLocation = (result) => {
     setSearchedLocation([Number(result.lat), Number(result.lon)]);
     setSearchedCompanyId(null);
+    setSelectedId(null);
     setLocationQuery(result.display_name.split(",").slice(0, 2).join(", "));
   };
 
@@ -57,23 +60,27 @@ export default function MapPage() {
     const query = locationQuery.trim().toLowerCase();
     if (query.length < 2) return [];
     const searchable = companies.map((company) => ({ ...company, productsText: Array.isArray(company.products) ? company.products.map((product) => product?.product_name || product?.name || product).join(" ") : "" }));
-    return new Fuse(searchable, { keys: ["name", "category_name", "productsText"], threshold: 0.35 }).search(query).slice(0, 5).map(({ item }) => item);
+    return new Fuse(searchable, { keys: ["name", "category_name", "address", "productsText"], threshold: 0.35 }).search(query).slice(0, MAX_SEARCH_RESULTS).map(({ item }) => item);
   }, [companies, locationQuery]);
 
-  const locationSuggestionsPanel = (localSuggestions.length > 0 || locationSuggestions.length > 0) ? (
+  const visibleLocationSuggestions = locationSuggestions.slice(0, MAX_SEARCH_RESULTS);
+  const locationSuggestionsPanel = (localSuggestions.length > 0 || visibleLocationSuggestions.length > 0 || (locationQuery.trim().length >= 2 && !locationLoading)) ? (
     <div className="position-absolute start-0 end-0 mt-1 bg-white rounded-3 shadow border overflow-hidden" style={{ zIndex: 1000, top: "100%" }}>
+      {localSuggestions.length > 0 && <div className="px-3 pt-2 pb-1 text-uppercase text-muted-brand" style={{ fontSize: "0.65rem", letterSpacing: "0.08em" }}>Companies</div>}
       {localSuggestions.map((company) => (
-        <button type="button" key={`company-${company.id}`} className="w-100 text-start border-0 bg-white px-3 py-2 small" onClick={() => { setLocationQuery(company.name); setSearchedLocation([company.lat, company.lng]); setSearchedCompanyId(company.id); }}>
+        <button type="button" key={`company-${company.id}`} className="w-100 text-start border-0 bg-white px-3 py-2 small" onClick={() => { setLocationQuery(company.name); setSearchedLocation([company.lat, company.lng]); setSearchedCompanyId(company.id); setSelectedId(company.id); }}>
           <i className="bi bi-buildings text-primary-brand me-2" />
           <strong>{company.name}</strong><span className="text-muted-brand"> · {company.category_name || "Company"}</span>
         </button>
       ))}
-      {locationSuggestions.map((result) => (
+      {visibleLocationSuggestions.length > 0 && <div className="px-3 pt-2 pb-1 text-uppercase text-muted-brand" style={{ fontSize: "0.65rem", letterSpacing: "0.08em" }}>Streets &amp; places in Ghana</div>}
+      {visibleLocationSuggestions.map((result) => (
         <button type="button" key={result.place_id} className="w-100 text-start border-0 bg-white px-3 py-2 small" onClick={() => selectLocation(result)}>
           <i className="bi bi-geo-alt text-primary-brand me-2" />
           {result.display_name}
         </button>
       ))}
+      {localSuggestions.length === 0 && visibleLocationSuggestions.length === 0 && !locationLoading && <div className="px-3 py-3 small text-muted-brand">No companies or Ghana locations found.</div>}
     </div>
   ) : null;
 
@@ -101,14 +108,24 @@ export default function MapPage() {
         });
   }, [companies]);
 
+  const nearbyCompanies = useMemo(() => {
+    if (!searchedLocation) return [];
+    return companies
+      .filter((company) => activeCats.includes(company.category))
+      .map((company) => ({ ...company, distanceKm: haversineDistance(searchedLocation[0], searchedLocation[1], company.lat, company.lng) }))
+      .filter((company) => Number.isFinite(company.distanceKm) && company.distanceKm <= NEARBY_RADIUS_KM)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, 8);
+  }, [activeCats, companies, searchedLocation]);
+
   const filtered = useMemo(() => companies.filter((c) => {
     if (!activeCats.includes(c.category)) return false;
     if (searchedCompanyId) return c.id === searchedCompanyId;
-    if (searchedLocation) return false;
+    if (searchedLocation) return nearbyCompanies.some((company) => company.id === c.id);
     if (!locationQuery) return true;
     const values = [c.name, c.category_name, ...(Array.isArray(c.products) ? c.products.flatMap((product) => [product, product?.product_name, product?.name]) : [])];
     return values.some((value) => String(value || "").toLowerCase().includes(locationQuery.trim().toLowerCase()));
-  }), [activeCats, companies, locationQuery, searchedLocation, searchedCompanyId]);
+  }), [activeCats, companies, locationQuery, searchedLocation, searchedCompanyId, nearbyCompanies]);
 
   const nearest = useMemo(
     () => [...filtered].map((c) => ({ ...c, distanceKm: userPosition ? haversineDistance(userPosition.lat, userPosition.lng, c.lat, c.lng) : null })),
@@ -130,6 +147,7 @@ export default function MapPage() {
     setLocationQuery("");
     setSearchedLocation(null);
     setSearchedCompanyId(null);
+    setSelectedId(null);
   };
 
   const locateUser = () => {

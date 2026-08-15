@@ -1,6 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { useEffect } from "react";
+import { publicId } from "../utils/publicId";
 
 export const NIA_CENTER = [5.6037, -0.1870];
 
@@ -64,7 +65,7 @@ export default function AdminMap({
             const lng = Number(c.lng ?? c.longitude ?? c.lat);
             if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
             return (
-              <Marker key={c.id} position={[lat, lng]} icon={companyIcon(categoryColor)}>
+              <Marker key={publicId(c)} position={[lat, lng]} icon={companyIcon(categoryColor)}>
                 <Popup>
                   <div style={{ minWidth: 150 }}>
                     <div className="fw-semibold">{c.name || c.company_name}</div>

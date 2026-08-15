@@ -15,8 +15,9 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { get, set, del } from "idb-keyval";
+import PublicCacheSync from "./components/PublicCacheSync.jsx";
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 2, refetchOnWindowFocus: false, networkMode: "online" } } });
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 2, refetchOnWindowFocus: true, refetchOnMount: "always", networkMode: "online" } } });
 const queryPersister = createAsyncStoragePersister({
   storage: { getItem: get, setItem: set, removeItem: del },
   key: "wholesale-locator-query-cache",
@@ -28,11 +29,12 @@ createRoot(document.getElementById("root")).render(
       client={queryClient}
       persistOptions={{
         persister: queryPersister,
-        maxAge: 10 * 60 * 1000,
-        buster: "public-cache-v1",
+        maxAge: 2 * 60 * 1000,
+        buster: "public-cache-v2",
       }}
     >
       <BrowserRouter>
+      <PublicCacheSync />
       <SystemSettingsProvider>
         <AuthProvider>
           <FavoritesProvider>

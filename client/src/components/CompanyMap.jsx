@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Tooltip, useMap } from "react-leaflet";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import L from "leaflet";
 import { Link } from "react-router-dom";
 import { formatDistance } from "../utils/distance";
@@ -73,6 +73,28 @@ export default function CompanyMap({
 }) {
   const { user } = useAuth();
   const userLabel = user?.name?.trim() || "You";
+  const [hiddenLabels, setHiddenLabels] = useState(() => new Set());
+
+  const toggleLabel = (key) => {
+    setHiddenLabels((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const labelToggle = (key, hidden, label) => (
+    <button
+      type="button"
+      title={hidden ? `Show ${label}` : `Hide ${label}`}
+      aria-label={hidden ? `Show ${label}` : `Hide ${label}`}
+      onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleLabel(key); }}
+      style={{ border: 0, background: "transparent", color: "#1c6b41", padding: "0 2px", marginLeft: 6, lineHeight: 1, cursor: "pointer" }}
+    >
+      <i className={`bi ${hidden ? "bi-eye" : "bi-eye-slash"}`} />
+    </button>
+  );
 
   
   return (
@@ -89,7 +111,12 @@ export default function CompanyMap({
 
         {showUserLocation && <Marker position={userPosition || center} icon={userIcon()}><Popup>{userLabel}</Popup></Marker>}
 
-        {locationPosition && <Marker position={locationPosition} icon={pinIcon("#c52323")}><Tooltip permanent direction="top" offset={[0, -30]}>{locationLabel}</Tooltip></Marker>}
+        {locationPosition && <Marker position={locationPosition} icon={pinIcon("#c52323")}>
+          {!hiddenLabels.has("location") && <Tooltip permanent interactive direction="top" offset={[0, -30]}>
+            <span>{locationLabel}</span>{labelToggle("location", false, "selected location")}
+          </Tooltip>}
+          {hiddenLabels.has("location") && <Tooltip permanent interactive direction="top" offset={[0, -30]}>{labelToggle("location", true, "selected location")}</Tooltip>}
+        </Marker>}
 
         {companies.map((c) => {
           const lat = Number(c.lat ?? c.latitude);
@@ -107,7 +134,10 @@ export default function CompanyMap({
               icon={companyIcon(cat.color)}
               eventHandlers={onSelect ? { click: () => onSelect(c.id) } : undefined}
             >
-              <Tooltip permanent direction="top" offset={[0, -38]} opacity={0.9}>{c.name}</Tooltip>
+              {!hiddenLabels.has(`company-${c.id}`) && <Tooltip permanent interactive direction="top" offset={[0, -38]} opacity={0.9}>
+                <span>{c.name}</span>{labelToggle(`company-${c.id}`, false, c.name)}
+              </Tooltip>}
+              {hiddenLabels.has(`company-${c.id}`) && <Tooltip permanent interactive direction="top" offset={[0, -38]} opacity={0.9}>{labelToggle(`company-${c.id}`, true, c.name)}</Tooltip>}
               <Popup>
                 <div style={{ minWidth: 160 }}>
                   <div className="fw-semibold">{c.name}</div>

@@ -13,6 +13,7 @@ const mapRoute = require("./routes/mapRoute");
 const systemRoute = require("./routes/systemRoute");
 const healthRoute = require("./routes/healthRoute"); // fixed typo
 const routeRoute = require("./routes/routeRoute");
+const cacheRoute = require("./routes/cacheRoute");
 const startHealthCheckCron = require('./service/cronJob');
 
 const app = express();
@@ -42,6 +43,7 @@ app.use('/api/company', companyRoute);
 app.use('/api/company/:id/images', companyImageRoute);
 app.use('/api/map', mapRoute);
 app.use('/api/route', routeRoute);
+app.use('/api/cache', cacheRoute);
 app.use('/api', healthRoute); // <-- mounted, gives you GET /api/health
 
 app.get("/", (req, res) => {

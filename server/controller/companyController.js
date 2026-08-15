@@ -6,6 +6,7 @@ const invalidatePublicCatalog = () => Promise.all([
   redis.del(redis.KEYS.publicCompanies, redis.KEYS.publicCategories, redis.KEYS.publicStats, redis.KEYS.publicMap),
   redis.delPattern("public:company:*") ,
   redis.delPattern("public:category:*:companies"),
+  redis.set(redis.KEYS.publicCatalogVersion, Date.now(), 24 * 60 * 60),
 ]);
 
 //========== CATEGORY MANAGEMENT ENDPOINTS (add, update, delete) ============================
@@ -187,7 +188,6 @@ exports.updateCompany = async (req, res) => {
     const { id } = req.params;
     const companyId = await resolveInternalId(db, "companies", id);
     if (!companyId) return res.status(404).json({ message: "Company not found" });
-    const categoryId = category_id ? await resolveInternalId(db, "categories", category_id) : null;
 
     const {
       company_name,
@@ -201,6 +201,9 @@ exports.updateCompany = async (req, res) => {
       status,
       category_id
     } = req.body;
+    const categoryId = category_id
+      ? await resolveInternalId(db, "categories", category_id)
+      : null;
 
     const [result] = await db.query(
       `UPDATE companies
@@ -247,7 +250,10 @@ exports.updateCompany = async (req, res) => {
 //delete a company
 exports.deleteCompany = async (req, res) => {
   try {
-    const { id } = req.params;
+    const companyId = await resolveInternalId(db, "companies", req.params.id);
+    if (!companyId) {
+      return res.status(404).json({ message: "Company not found" });
+    }
 
     const [result] = await db.query(
       "DELETE FROM companies WHERE id=?",
@@ -326,7 +332,7 @@ exports.getProducts = async (req, res) => {
     const company_id = await resolveInternalId(db, "companies", req.params?.company_id);
     if (!company_id) return res.status(404).json({ message: "Company not found" });
     const [rows] = await db.query(`
-      SELECT p.*, p.public_id
+      SELECT p.*, p.public_id, p.created_at
       FROM products p
       WHERE company_id = ?
       `, [company_id]);

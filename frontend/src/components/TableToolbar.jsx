@@ -5,6 +5,8 @@ export default function TableToolbar({
   filters = null,
   addLabel,
   onAdd,
+  addIcon = "bi-plus",
+  addClassName = "btn btn-brand rounded-3 px-3 d-flex align-items-center gap-2 flex-shrink-0",
 }) {
   return (
     <div className="table-toolbar">
@@ -22,8 +24,8 @@ export default function TableToolbar({
         {filters}
       </div>
       {onAdd && (
-        <button className="btn btn-outline-danger rounded-3 px-3 d-flex align-items-center gap-2 flex-shrink-0" onClick={onAdd}>
-          <i className="bi bi-trash" /> <span>{addLabel}</span>
+        <button type="button" className={addClassName} onClick={onAdd}>
+          <i className={`bi ${addIcon}`} /> <span>{addLabel}</span>
         </button>
       )}
     </div>

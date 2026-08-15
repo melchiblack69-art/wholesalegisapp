@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState,useMemo } from "react";
 import Topbar from "../components/Topbar";
 import Avatar from "../components/Avatar";
 import { useSidebar } from "../context/SidebarContext";
@@ -7,9 +7,17 @@ import { api } from "../api/client";
 import { publicId } from "../utils/publicId";
 import { useModal } from "../context/ModalContext";
 import { useSystemSettings } from "../context/SystemSettingsContext";
-import LoaderSpinner from "../components/LoadingSpinner";
+import Spinner from "../components/Spinner";
 
 const tabs = ["Profile", "Change Password", "System Settings"];
+
+const roleLabels = {
+  warehouse_manager: "Warehouse manager",
+  warehouse_user: "Warehouse user",
+  user: "Standard user",
+  super_admin: "Super Administrator",
+};
+
 
 const getInitials = (name = "") =>
   name
@@ -681,6 +689,11 @@ export default function Settings() {
     ["Maintenance Mode", systemCtx.maintenance_mode ? "On" : "Off"],
   ];
 
+  const roleLabel = useMemo(
+    () => roleLabels[profileUser?.role] || profileUser?.role,
+    [profileUser?.role],
+  );
+
   return (
     <>
       <Topbar
@@ -795,7 +808,7 @@ export default function Settings() {
                     <label className="form-label">ID</label>
                     <input
                       className="form-control"
-                      value={profileUser?.id ?? ""}
+                      value={profileUser?.public_id ?? ""}
                       disabled
                     />
                   </div>
@@ -835,7 +848,7 @@ export default function Settings() {
                     <label className="form-label">Role</label>
                     <input
                       className="form-control"
-                      value={profileUser?.role ?? ""}
+                      value={roleLabel}
                       disabled
                     />
                   </div>
@@ -998,7 +1011,7 @@ export default function Settings() {
         {tab === "System Settings" &&
           (!system ? (
             <div className="card-surface p-4">
-              <LoadingSpinner fullScreen label="Loading..." />
+              <Spinner fullscreen background="rgba(7, 21, 15, 0.55)" dotColor="#fff" label="Loading..." />
             </div>
           ) : (
             <div className="card-surface p-4">

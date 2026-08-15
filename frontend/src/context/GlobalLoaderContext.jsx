@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { subscribeGlobalLoading } from "../utils/loadBus";
-import LoadingSpinner from "../components/LoadingSpinner";
+import Spinner from "../components/Spinner";
 
 export  function GlobalLoader() {
   const [state, setState] = useState({ count: 0, label: "" });
@@ -8,5 +8,5 @@ export  function GlobalLoader() {
   useEffect(() => subscribeGlobalLoading(setState), []);
 
   if (state.count === 0) return null;
-  return <LoadingSpinner fullScreen label={state.label} />;
+  return <Spinner fullscreen background="rgba(7, 21, 15, 0.55)" dotColor="#fff" label={state.label || "LOADING"} />;
 }

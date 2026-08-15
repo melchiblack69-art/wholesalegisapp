@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { api } from "../api/client";
 import { publicId } from "../utils/publicId";
 import Topbar from "../components/Topbar";
@@ -19,6 +19,14 @@ const formatDate = (value) => {
     year: "numeric",
   });
 };
+
+const roleLabels = {
+  warehouse_manager: "Warehouse manager",
+  warehouse_user: "Warehouse user",
+  user: "Standard user",
+  super_admin: "Super Administrator",
+};
+
 const getInitials = (name = "") =>
   name
     .trim()
@@ -154,14 +162,14 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
        showModal("Password changed successfully.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } catch (e) {
-       showModal(e.message ?? "Failed to change password.", { type: "error", title: "Error", 
+       showModal(e.message ?? "Password changing failed.", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } finally {
       setSaving(false);
     }
   };
 
-
+//_________________________Handle details loading_________________________________________
   useEffect(() => {
     if (!user?.id) return;
 
@@ -195,7 +203,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
   const updateProfileField = (field, value) => {
     setProfile((currentProfile) => ({ ...currentProfile, [field]: value }));
   };
-
+//________________Handle Photo Selection______________________________
   const handlePhotoSelection = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -211,6 +219,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
     if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
+  //_____________________Handle details save
   const handleSave = async () => {
     if (!user?.id) return;
 
@@ -238,6 +247,7 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
     }
   };
 
+//_______________Handle Existing Photo Delete
   const handleDeleteExistingPhoto = async () => {
     if (!user?.id || !user.photo) return;
 
@@ -249,14 +259,14 @@ const handle = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }));
        showModal("Profile photo removed.", { type: "success", title: "Success", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } catch (error) {
-       showModal("Something went wrong.", { type: "error", title: "Error", 
+       showModal(error.message || "Something went wrong.", { type: "error", title: "Error", 
         autoClose: true, autoCloseDelay: 2000, confirmText: false });
     } finally {
       setIsRemovingPhoto(false);
     }
   };
-
-const getDbSize = async() =>{
+//_______________Database size____________________ 
+const getDbSize = async () =>{
 try{
 const size = await api.get("/api/system/database-size");
 setDbSize(size.size_mb);
@@ -292,6 +302,11 @@ console.error(e)
   ["Database Size", `${dbSize} MB`],
   ["Maintenance Mode", systemCtx.maintenance_mode ? "On" : "Off"],
 ];
+
+const roleLabel = useMemo(
+    () => roleLabels[profileUser?.role] || profileUser?.role,
+    [profileUser?.role],
+  );
 
   return (
     <>
@@ -345,12 +360,12 @@ console.error(e)
                 </div>
 
                 <div className="row g-3">
-                  <div className="col-sm-6"><label className="form-label">ID</label><input className="form-control" value={profileUser?.id ?? ""} disabled /></div>
+                  <div className="col-sm-6"><label className="form-label">ID</label><input className="form-control" value={profileUser?.public_id ?? ""} disabled /></div>
                   <EditableProfileField field="name" label="Full Name" value={profile.name} editingField={editingField} onChange={updateProfileField} setEditingField={setEditingField} />
                   <EditableProfileField field="username" label="Username" value={profile.username} editingField={editingField} onChange={updateProfileField} setEditingField={setEditingField} />
                   <EditableProfileField field="email" label="Email" value={profile.email} editingField={editingField} onChange={updateProfileField} setEditingField={setEditingField} />
                   <EditableProfileField field="phone" label="Phone" value={profile.phone} editingField={editingField} onChange={updateProfileField} setEditingField={setEditingField} />
-                  <div className="col-sm-6"><label className="form-label">Role</label><input className="form-control" value={profileUser?.role ?? ""} disabled /></div>
+                  <div className="col-sm-6"><label className="form-label">Role</label><input className="form-control" value={roleLabel} disabled /></div>
                  
                 </div>
 

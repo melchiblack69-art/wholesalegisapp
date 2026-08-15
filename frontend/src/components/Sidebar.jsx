@@ -61,7 +61,7 @@ export default function Sidebar({
   const links = isCompanyUser
     ? companyLinks.map((link) => ({
         ...link,
-        to: link.to.replace(":id", user.companyId),
+        to: link.to.replace(":id", user.companyPublicId || user.companyId),
       }))
     : superAdminLinks;
 
@@ -138,7 +138,7 @@ export default function Sidebar({
 
         <div
           className="p-2 border-top"
-          style={{ borderColor: "rgba(255,255,255,0.08)" }}
+          style={{ borderColor: "rgba(199, 17, 17, 0.08)" }}
         >
           <button
             className="sidebar-link w-100 border-0 bg-transparent text-start"

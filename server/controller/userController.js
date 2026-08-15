@@ -340,7 +340,7 @@ exports.uploadUserPhoto = async (req, res) => {
     // Return updated admin
     const [updated] = await db.query(
       `SELECT id, name, phone,
-              email, role, photo
+              email, role, photo,created_at
        FROM users WHERE id = ? LIMIT 1`,
       [userId],
     );
@@ -351,7 +351,7 @@ exports.uploadUserPhoto = async (req, res) => {
     res.json({ message: "Photo updated", user: updated[0] });
   } catch (err) {
     console.error("uploadUserPhoto Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error ⚠️" });
   }
 };
 
@@ -367,7 +367,7 @@ exports.deleteUserPhoto = async (req, res) => {
       [userId],
     );
     if (!rows.length)
-      return res.status(404).json({ message: "Record not found" });
+      return res.status(404).json({ message: "No photo found" });
 
     const publicId = extractPublicId(rows[0].photo);
 
@@ -379,7 +379,7 @@ exports.deleteUserPhoto = async (req, res) => {
 
     const [updated] = await db.query(
       `SELECT id, name, phone,
-              email, role, photo
+              email, role, photo,created_at
        FROM users WHERE id = ? LIMIT 1`,
       [userId],
     );
@@ -388,7 +388,7 @@ exports.deleteUserPhoto = async (req, res) => {
     res.json({ message: "Photo removed", user: updated[0] });
   } catch (err) {
     console.error("deleteUserPhoto Error:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error ⚠️" });
   }
 };
 
@@ -457,7 +457,7 @@ exports.getAllCompanies = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, public_id, name, email, phone, role, photo,created_at
+      `SELECT id, public_id, name, email, phone, role, photo, created_at
        FROM users WHERE id = ?`,
       [req.user?.id],
     );

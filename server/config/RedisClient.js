@@ -121,6 +121,7 @@ async function delPattern(pattern) {
 
 // ── Cache key constants ───────────────────────────────────────────────────────
 const KEYS = {
+  publicCatalogVersion: 'public:catalog:version',
   publicCompanies: 'public:companies',
   publicCompany: (id) => `public:company:${id}`,
   publicProducts: (id) => `public:company:${id}:products`,

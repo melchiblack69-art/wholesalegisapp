@@ -92,6 +92,7 @@ export default function ProfileDisplay({
     setAvatarUrl(user.photo || user.avatarUrl || "");
     setImgError(false);
   }, [user.photo, user.avatarUrl]);
+  
   const [feedback, setFeedback] = useState({
     type: "",
     text: "",
@@ -99,8 +100,6 @@ export default function ProfileDisplay({
   // ---- Password tab state ----
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
-  const [pwError, setPwError] = useState("");
-  const [pwSuccess, setPwSuccess] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -124,16 +123,14 @@ export default function ProfileDisplay({
   };
 
   useEffect(() => {
-    if (!feedback.text && !pwError && !pwSuccess) return;
+    if (!feedback.text) return;
     
     const timer = setTimeout(() => {
       setFeedback({ type: "", text: "" });
-      setPwError("");
-      setPwSuccess("");
     }, 4000);
 
     return () => clearTimeout(timer);
-  }, [feedback, pwError, pwSuccess]);
+  }, [feedback]);
 
   const saveEdit = async (e) => {
     e.preventDefault();
@@ -175,7 +172,12 @@ export default function ProfileDisplay({
         ? await onAvatarChange(file)
         : await api.put(`/api/user/${publicId(user)}/photo`, data, { isForm: true });
       if (result?.user) { updateCurrentUser(result.user); setAvatarUrl(result.user.photo || localPreview); }
-    } finally {
+    } catch(err){
+      return setFeedback({
+        type: "error", 
+        text: err?.message || "Could not update photo"});
+    }
+    finally {
       setAvatarBusy(false);
       e.target.value = "";
     }
@@ -187,7 +189,12 @@ export default function ProfileDisplay({
     const result = onDeletePhoto ? await onDeletePhoto() : await api.del(`/api/user/${publicId(user)}/photo`);
       if (result?.user) updateCurrentUser(result.user);
       setAvatarUrl("");
-    } finally {
+    }catch (err){
+      return setFeedback({
+        type: "error", 
+        text: err?.message || "Could not delete photo"});
+    }
+     finally {
       setAvatarBusy(false);
     }
   };
@@ -197,29 +204,36 @@ export default function ProfileDisplay({
 
   const submitPasswordChange = async (e) => {
     e.preventDefault();
-    setPwError("");
-    setPwSuccess("");
 
     if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
-      setPwError("Please fill in all password fields.");
-      return;
-    }
-    if (pwForm.next.length < 4) {
-      setPwError("New password must be at least 4 characters.");
-      return;
-    }
-    if (pwForm.next !== pwForm.confirm) {
-      setPwError("New password and confirmation don't match.");
-      return;
+       return setFeedback({
+        type: "error", 
+        text: "Please fill in all password fields."});
     }
 
+    if (pwForm.next.length < 4) {
+       return setFeedback({
+        type: "error", 
+        text: "New password must be at least 4 characters."});
+    }
+    if (pwForm.next !== pwForm.confirm) {
+       return setFeedback({
+        type: "error", 
+        text: "New password and confirmation don't match."});
+    }
+     
     setPwSaving(true);
     try {
       await onChangePassword({ currentPassword: pwForm.current, newPassword: pwForm.next });
-      setPwSuccess("Password updated successfully.");
       setPwForm({ current: "", next: "", confirm: "" });
+       return setFeedback({
+        type: "success", 
+        text: "Password updated successfully."});
+    
     } catch (err) {
-      setPwError(err?.message || "Couldn't update password. Please try again.");
+       return setFeedback({
+        type: "error", 
+        text: err?.message  || "Couldn't update password. Please try again" });
     } finally {
       setPwSaving(false);
     }
@@ -344,7 +358,7 @@ export default function ProfileDisplay({
         {/* Feedback */}
         {feedback.text && (
           <div
-            className={`d-flex align-items-center gap-2 px-2 py-2 rounded-3 shadow-sm border mb-4 ${
+            className={`d-flex align-items-center gap-2 px-2 py-2 rounded-3 shadow-sm border mb-3 ${
               feedback.type === "success"
                 ? "bg-success-subtle border-success text-success"
                 : "bg-danger-subtle border-danger text-danger"
@@ -425,16 +439,6 @@ export default function ProfileDisplay({
         {/* ---------------- Change Password tab ---------------- */}
         {activeTab === "password" && (
           <form onSubmit={submitPasswordChange}>
-            {pwError && (
-              <div className="profile-alert profile-alert-error">
-                <i className="bi bi-exclamation-circle" /> {pwError}
-              </div>
-            )}
-            {pwSuccess && (
-              <div className="profile-alert profile-alert-success">
-                <i className="bi bi-check-circle" /> {pwSuccess}
-              </div>
-            )}
 
             <PasswordField
               label="Current password"

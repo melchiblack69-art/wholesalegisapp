@@ -7,12 +7,14 @@ const {
   getAllCompanyAdmins,
   getAllCompanies,
   getMyCompanyDetails,
+  getCompanyDashboardStats,
   getAllAdmins,
   updateUser,
   deleteAdminPhoto,
   changePassword,
-  getHelpMessages
+  getHelpMessages, getReportData, register, getAdminDetails, getCompanyAdminsByCompany, deleteCompanyUser
 } = require("../controller/adminController");
+const { deleteHelpMessage, deleteAllHelpMessages } = require("../controller/adminController");
 const protect = require("../middleware/auth");
 const checkMaintenance = require("../middleware/checkMaintenance");
 //const passwordResetRateLimit  = require("../../middleware/passwordResetRateLimit");
@@ -27,13 +29,21 @@ router.get("/company-name", protect, checkMaintenance, getCompanyName);
 //DISPLAY TO SUPER ADMINS
 router.get("/dashboard", protect, checkMaintenance,getDashboardDetails);
 router.get("/admins", protect, checkMaintenance, getAllAdmins);
+router.get("/admins/:id", protect, checkMaintenance, getAdminDetails);
+router.delete("/admins/:id", protect, checkMaintenance, deleteCompanyUser);
+router.post("/admins", protect, checkMaintenance, register);
 router.get("/companies", protect, checkMaintenance, getAllCompanies);
 router.get("/messages", protect, checkMaintenance, getHelpMessages);
+router.delete("/messages/:id", protect, checkMaintenance, deleteHelpMessage);
+router.delete("/messages", protect, checkMaintenance, deleteAllHelpMessages);
+router.get("/reports/:type", protect, checkMaintenance, getReportData);
 //DISPLAY TO COMPANY ADMINS
 router.get("/company-admins", protect, checkMaintenance, getAllCompanyAdmins);
+router.get("/company-admins/:companyId", protect, checkMaintenance, getCompanyAdminsByCompany);
 router.put("/update/:id", protect, checkMaintenance, upload.single("photo"), updateUser);
 router.delete("/admins/:id/photo", protect, checkMaintenance, deleteAdminPhoto);
 router.get("/mycompany/:company_id", protect, checkMaintenance, getMyCompanyDetails);
+router.get("/company/stats", protect, checkMaintenance, getCompanyDashboardStats);
 router.put("/change-password/:id", protect, checkMaintenance, changePassword);
 
 /*router.post("/register",protect, upload.single('photo'), register);

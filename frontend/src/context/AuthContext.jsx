@@ -19,6 +19,8 @@ function normalizeUser(payload) {
     photo: source.photo ?? source.avatar ?? source.profile_photo ?? source.image ?? source.image_url ?? source.imageUrl ?? null,
     // A super_admin has no company_id by design.
     companyId: source.company_id ?? source.companyId ?? null,
+    companyPublicId: source.company_public_id ?? source.companyPublicId ?? null,
+    companyName: source.company_name ?? source.companyName ?? "",
   };
 }
 
