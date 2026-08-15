@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return <Spinner fullscreen background="rgba(7, 21, 15, 0.55)" dotColor="#fff" label="Loading..." />;
+  if (loading) return <Spinner fullscreen label="Loading..." />;
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;

@@ -1011,7 +1011,7 @@ export default function Settings() {
         {tab === "System Settings" &&
           (!system ? (
             <div className="card-surface p-4">
-              <Spinner fullscreen background="rgba(7, 21, 15, 0.55)" dotColor="#fff" label="Loading..." />
+              <Spinner fullscreen label="Loading..." />
             </div>
           ) : (
             <div className="card-surface p-4">

@@ -20,7 +20,7 @@ export function SystemSettingsProvider({ children }) {
   const { data: settings = FALLBACK, isFetched: loaded, refetch } = useQuery({
     queryKey: ["system-settings"],
     queryFn: async () => {
-      const data = await api.get("/api/system/sys-details");
+      const data = await api.get(`/api/system/sys-details?ts=${Date.now()}`);
       return {
         id: data.id,
         system_name: data.system_name || "",
@@ -32,7 +32,10 @@ export function SystemSettingsProvider({ children }) {
         updated_at: data.updated_at || "",
       };
     },
-    staleTime: 30 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 30 * 1000,
   });
 
   const updateSettings = (next) => queryClient.setQueryData(["system-settings"], (current = FALLBACK) => ({ ...current, ...next }));

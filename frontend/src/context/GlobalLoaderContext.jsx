@@ -8,5 +8,5 @@ export  function GlobalLoader() {
   useEffect(() => subscribeGlobalLoading(setState), []);
 
   if (state.count === 0) return null;
-  return <Spinner fullscreen background="rgba(7, 21, 15, 0.55)" dotColor="#fff" label={state.label || "LOADING"} />;
+  return <Spinner fullscreen label={state.label || "LOADING"} />;
 }

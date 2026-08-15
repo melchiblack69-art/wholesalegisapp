@@ -24,6 +24,8 @@ function StartupGate({ children }) {
   useEffect(() => {
     if (loaded && maintenance_mode && location.pathname !== "/maintenance") {
       navigate("/maintenance", { replace: true });
+    } else if (loaded && !maintenance_mode && location.pathname === "/maintenance") {
+      navigate("/", { replace: true });
     }
   }, [loaded, maintenance_mode, location.pathname, navigate]);
   if (!loaded) return <LoadingSpinner fullScreen />;

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Topbar from "../components/Topbar";
-import Spinner from "../components/Spinner";
 import { useSidebar } from "../context/SidebarContext";
 import { useModal } from "../context/ModalContext";
 import { api } from "../api/client";
@@ -91,7 +90,7 @@ export default function UserProfile() {
     () => roleLabels[form.role] || form.role,
     [form.role],
   );
-  if (loading) return <Spinner dotColor="#333" />;
+  if (loading) return null;
 
   return (
     <>

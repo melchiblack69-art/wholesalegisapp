@@ -1,7 +1,23 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSystemSettings } from "../context/SystemSettingsContext";
 
 export default function MaintenancePage() {
   const system = useSystemSettings();
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const refreshStatus = async () => {
+      setChecking(true);
+      const result = await system.refresh();
+      if (active && !result.data?.maintenance_mode) navigate("/", { replace: true });
+      if (active) setChecking(false);
+    };
+    refreshStatus();
+    return () => { active = false; };
+  }, [navigate, system.refresh]);
   return (
     <div className="sysmaint-page">
       <header className="sysmaint-header">
@@ -35,9 +51,10 @@ export default function MaintenancePage() {
             type="button"
             className="btn btn-brand"
             onClick={() => window.location.reload()}
+            disabled={checking}
           >
-            <i className="bi bi-arrow-clockwise me-2" />
-            Try again
+            <i className={`bi ${checking ? "bi-arrow-repeat" : "bi-arrow-clockwise"} me-2`} />
+            {checking ? "Checking..." : "Try again"}
           </button>
         </div>
       </main>
