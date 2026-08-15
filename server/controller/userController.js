@@ -1,7 +1,7 @@
 const db = require("../config/db");
 const bcrypt = require("bcryptjs");
 
-const generateToken = require("../config/jwt");
+const generateToken = require("../config/userJwt");
 
 const {
   uploadToCloudinary,
@@ -143,6 +143,7 @@ exports.login = async (req, res) => {
     // ── 4. Generate JWT ───────────────────────────────────────
     const token = generateToken({
       id: user.id,
+      public_id: user.public_id,
       role: user.role,
     });
 
@@ -175,15 +176,12 @@ exports.login = async (req, res) => {
 /* ================= CHANGE PASSWORD ======================================= */
 exports.changePassword = async (req, res) => {
   try {
-    const adminId = req?.user?.id;
+    const adminId = await resolveInternalId(db, "users", req?.user?.id || req?.user?.public_id);
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword)
       return res.status(400).json({ message: "All fields are required" });
 
-    const [rows] = await db.execute(`SELECT password FROM users WHERE id = ? AND role=?`, [
-      adminId,
-      "user"
-    ]);
+    const [rows] = await db.execute(`SELECT password FROM users WHERE id = ?`, [adminId]);
 
     if (!rows.length)
       return res
@@ -221,9 +219,12 @@ exports.changePassword = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = await resolveInternalId(db, "users", req.params?.id);
+    const requesterId = await resolveInternalId(db, "users", req.user?.id || req.user?.public_id);
 
     // ── 1. Make sure user can only update their own profile ───
-    if (String(req.user?.id) !== String(userId)) {
+    const sameAccount = requesterId && String(requesterId) === String(userId);
+    const samePublicAccount = req.user?.public_id && String(req.user.public_id) === String(req.params?.id);
+    if (!sameAccount && !samePublicAccount) {
       return res.status(403).json({
         message: "You can't update this profile",
       });
@@ -231,8 +232,8 @@ exports.updateUser = async (req, res) => {
 
     // ── 2. Verify user exists ─────────────────────────────────
     const [rows] = await db.query(
-      `SELECT id, name, email, phone, photo, created_at FROM users WHERE id = ? AND role = ? `,
-      [userId, "user"]
+      `SELECT id, public_id, name, email, phone, photo, created_at FROM users WHERE id = ?`,
+      [userId]
     );
 
     if (!rows.length) {
@@ -276,6 +277,7 @@ exports.updateUser = async (req, res) => {
     const [updated] = await db.query(
       `SELECT
         id,
+        public_id,
         name,
         phone,
         email,
@@ -307,7 +309,9 @@ exports.updateUser = async (req, res) => {
 exports.uploadUserPhoto = async (req, res) => {
   try {
     const userId = await resolveInternalId(db, "users", req.params?.id);
+    const requesterId = await resolveInternalId(db, "users", req.user?.id || req.user?.public_id);
     if (!userId) return res.status(404).json({ message: "Record not found" });
+    if (!requesterId || String(requesterId) !== String(userId)) return res.status(403).json({ message: "You can't update this profile" });
     if (!req.file)
       return res.status(400).json({ message: "No image provided" });
 
@@ -339,7 +343,7 @@ exports.uploadUserPhoto = async (req, res) => {
 
     // Return updated admin
     const [updated] = await db.query(
-      `SELECT id, name, phone,
+      `SELECT id, public_id, name, phone, 
               email, role, photo,created_at
        FROM users WHERE id = ? LIMIT 1`,
       [userId],
@@ -360,7 +364,9 @@ exports.uploadUserPhoto = async (req, res) => {
 exports.deleteUserPhoto = async (req, res) => {
   try {
     const userId = await resolveInternalId(db, "users", req.params?.id);
+    const requesterId = await resolveInternalId(db, "users", req.user?.id || req.user?.public_id);
     if (!userId) return res.status(404).json({ message: "Record not found" });
+    if (!requesterId || String(requesterId) !== String(userId)) return res.status(403).json({ message: "You can't update this profile" });
 
     const [rows] = await db.query(
       "SELECT photo FROM users WHERE id = ? LIMIT 1",
@@ -396,7 +402,7 @@ exports.deleteUserPhoto = async (req, res) => {
 exports.deleteUserAccount = async (req, res) => {
   try {
     const targetId = await resolveInternalId(db, "users", req.params.id);
-    const requesterId = req.user?.id;
+    const requesterId = await resolveInternalId(db, "users", req.user?.id || req.user?.public_id);
     const requesterRole = req.user?.role;
     if (!requesterId || !targetId || String(requesterId) !== String(targetId))
       return res.status(403).json({ message: "Access required" });

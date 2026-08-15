@@ -135,7 +135,8 @@ export default function ProfileDisplay({
   const saveEdit = async (e) => {
     e.preventDefault();
     if (!editMode) return;
-    if(!/^\+?[0-9]{9,15}$/.test(form.phone)){
+    const phoneDigits = String(form.phone || "").replace(/\D/g, "");
+    if(phoneDigits.length < 9 || phoneDigits.length > 15){
       return setFeedback({
         type: "error", 
         text: "Enter a valid phone number."});
@@ -150,6 +151,8 @@ export default function ProfileDisplay({
       return setFeedback({
         type: "success", 
         text: "Profile updated."});
+    } catch (err) {
+      return setFeedback({ type: "error", text: err?.message || "Could not update profile." });
     } finally {
       setSaving(false);
     }
@@ -224,7 +227,8 @@ export default function ProfileDisplay({
      
     setPwSaving(true);
     try {
-      await onChangePassword({ currentPassword: pwForm.current, newPassword: pwForm.next });
+      if (onChangePassword) await onChangePassword({ currentPassword: pwForm.current, newPassword: pwForm.next });
+      else await api.put("/api/user/password", { currentPassword: pwForm.current, newPassword: pwForm.next });
       setPwForm({ current: "", next: "", confirm: "" });
        return setFeedback({
         type: "success", 
@@ -356,13 +360,17 @@ export default function ProfileDisplay({
           </button>
         </div>
         {/* Feedback */}
-        {feedback.text && (
+       {feedback.text && (
           <div
-            className={`d-flex align-items-center gap-2 px-2 py-2 rounded-3 shadow-sm border mb-3 ${
-              feedback.type === "success"
-                ? "bg-success-subtle border-success text-success"
-                : "bg-danger-subtle border-danger text-danger"
+            className={`d-flex align-items-center gap-1 px-1 py-1 mb-4 ${
+              feedback.type === "success" ? "text-white" : "text-white"
             }`}
+            style={{
+              background:
+                feedback.type === "success"
+                  ? "rgba(11, 216, 45, 0.8)"
+                  : "rgba(224, 13, 13, 0.87)",
+            }}
           >
             <i
               className={`bi ${

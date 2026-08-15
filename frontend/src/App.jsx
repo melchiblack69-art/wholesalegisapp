@@ -64,7 +64,7 @@ export default function App() {
           <Route path="/company/:companyId/users/:userId/edit" element={<ProtectedRoute><WarehouseUserProfile /></ProtectedRoute>} />
           <Route path="/company/:id/users" element={<ProtectedRoute><CompanyUsers /></ProtectedRoute>} />
           <Route path="/company/:companyId/users/new" element={<ProtectedRoute><WarehouseUserProfile /></ProtectedRoute>} />
-
+          <Route path="/company/:id/settings" element={ <ProtectedRoute> <CompanySettings /> </ProtectedRoute>} />
 
           {/* Full company directory: super admin only */}
           <Route path="/companies" element={<ProtectedRoute roles={["super_admin"]}><Companies /></ProtectedRoute>} />
@@ -78,8 +78,8 @@ export default function App() {
           <Route path="/users/new" element={<ProtectedRoute roles={["super_admin"]}><UserProfile /></ProtectedRoute>} />
           <Route path="/users/:id/edit" element={<ProtectedRoute roles={["super_admin"]}><UserProfile /></ProtectedRoute>} />
           <Route path="/contact" element={<ProtectedRoute roles={["super_admin"]}><Help /></ProtectedRoute>} />
-          <Route path="/settings"  element={<Settings />} />
-          <Route path="/company/:id/settings" element={<CompanySettings />} />
+          <Route path="/settings"   element={<ProtectedRoute roles={["super_admin"]}><Settings /></ProtectedRoute>} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

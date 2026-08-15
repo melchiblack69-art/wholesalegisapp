@@ -10,7 +10,7 @@ const { login, getMe, getAllCompanies, getCompanyDetail, help,
     updateUser,
    uploadUserPhoto
    ,getFavorites, addFavorite, removeFavorite
-   } = require("../controller/userController");
+   ,changePassword } = require("../controller/userController");
 const { getMapCompanies } = require("../controller/mapController");
 const { getCompanyImages } = require("../controller/imageController");
 const protect = require("../middleware/user");
@@ -21,6 +21,7 @@ router.post("/login", login);
 router.get("/me", protect, checkMaintenance, getMe);
 router.post("/register", checkMaintenance, register);
 router.put("/update/:id", protect, checkMaintenance, updateUser);
+router.put("/password", protect, checkMaintenance, changePassword);
 router.delete("/:id/photo", protect, checkMaintenance,deleteUserPhoto);
 router.put("/:id/photo", protect, checkMaintenance, upload.single("photo"), uploadUserPhoto);
 router.delete("/delete-account/:id", protect, checkMaintenance, deleteUserAccount);

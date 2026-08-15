@@ -56,9 +56,7 @@ export default function Contact() {
       setFeedback({
         type: "error",
         text:
-          err.response?.data?.message ||
-          err.message ||
-          "Something went wrong.",
+          err.response?.data?.message || err.message || "Something went wrong.",
       });
     } finally {
       setLoading(false);
@@ -75,11 +73,15 @@ export default function Contact() {
         {/* Feedback */}
         {feedback.text && (
           <div
-            className={`d-flex align-items-center gap-2 px-2 py-2 rounded-3 shadow-sm border mb-4 ${
-              feedback.type === "success"
-                ? "bg-success-subtle border-success text-success"
-                : "bg-danger-subtle border-danger text-danger"
+            className={`d-flex align-items-center gap-1 px-1 py-1 mb-4 ${
+              feedback.type === "success" ? "text-white" : "text-white"
             }`}
+            style={{
+              background:
+                feedback.type === "success"
+                  ? "rgba(11, 216, 45, 0.8)"
+                  : "rgba(224, 13, 13, 0.87)",
+            }}
           >
             <i
               className={`bi ${

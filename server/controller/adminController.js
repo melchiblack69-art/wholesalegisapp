@@ -11,6 +11,14 @@ const {
 
 const URL = process.env.REACT_APP_URL;
 
+async function resolveRequesterId(req) {
+  return resolveInternalId(db, "users", req.auth?.id || req.auth?.public_id);
+}
+
+async function resolveRequesterCompanyId(req) {
+  return resolveInternalId(db, "companies", req.auth?.company_id || req.auth?.company_public_id);
+}
+
 /* ================= HELPER: extract Cloudinary public_id from URL ========= */
 const extractPublicId = (url) => {
   if (!url || !url.includes("cloudinary.com")) return null;
@@ -204,7 +212,8 @@ exports.changePassword = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = await resolveInternalId(db, "users", req.params?.id);
-    if (!userId || (req.auth?.role !== "super_admin" && String(req.auth?.id) !== String(userId)))
+    const requesterId = await resolveRequesterId(req);
+    if (!userId || (req.auth?.role !== "super_admin" && String(requesterId) !== String(userId)))
       return res
         .status(403)
         .json({ message: "You can only update your own profile" });
@@ -327,7 +336,8 @@ exports.uploadAdminPhoto = async (req, res) => {
 exports.deleteAdminPhoto = async (req, res) => {
   try {
     const userId = await resolveInternalId(db, "users", req.params?.id);
-    if (!userId || String(req.auth?.id) !== String(userId))
+    const requesterId = await resolveRequesterId(req);
+    if (!userId || String(requesterId) !== String(userId))
       return res
         .status(403)
         .json({ message: "You can only remove your own photo" });
@@ -367,7 +377,7 @@ exports.deleteAdminPhoto = async (req, res) => {
 exports.deleteCompanyUser = async (req, res) => {
   try {
     const targetId = await resolveInternalId(db, "users", req.params.id);
-    const requesterId = req.auth?.id;
+    const requesterId = await resolveRequesterId(req);
     const requesterRole = req.auth?.role;
     if (!requesterId)
       return res.status(403).json({ message: "Admin access required" });
@@ -386,7 +396,8 @@ exports.deleteCompanyUser = async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ message: "User does not exist" });
     }
-    if (requesterRole !== "super_admin" && String(rows[0].company_id) !== String(req.auth?.company_id)) {
+    const requesterCompanyId = await resolveRequesterCompanyId(req);
+    if (requesterRole !== "super_admin" && String(rows[0].company_id) !== String(requesterCompanyId)) {
       return res.status(403).json({ message: "You can only delete users in your company" });
     }
     if (rows[0].photo) {
@@ -425,11 +436,13 @@ exports.getAdminDetails = async (req, res) => {
 /* ================= GET ALL ADMINS (COMPANY) ======================================== */
 exports.getAllCompanyAdmins = async (req, res) => {
   try {
+    const companyId = await resolveRequesterCompanyId(req);
+    if (!companyId) return res.status(403).json({ message: "Company access required" });
     const [rows] = await db.query(
       `SELECT id, public_id, company_id, name,username, phone,
               email, role, photo, last_login, created_at
        FROM users WHERE company_id = ?`,
-      [req.auth?.company_id],
+      [companyId],
     );
     res.json(rows); // photos are already Cloudinary URLs or null
   } catch (err) {
@@ -444,7 +457,8 @@ exports.getCompanyAdminsByCompany = async (req, res) => {
     const requestedCompanyId = await resolveInternalId(db, "companies", req.params.companyId);
     if (!requestedCompanyId) return res.status(404).json({ message: "Company not found" });
     const isSuperAdmin = req.auth?.role === "super_admin";
-    if (!isSuperAdmin && String(req.auth?.company_id) !== String(requestedCompanyId)) {
+    const requesterCompanyId = await resolveRequesterCompanyId(req);
+    if (!isSuperAdmin && String(requesterCompanyId) !== String(requestedCompanyId)) {
       return res.status(403).json({ message: "You can only view users in your company" });
     }
     const [rows] = await db.query(
@@ -490,7 +504,7 @@ exports.getMyCompanyDetails = async (req, res) => {
     const admin_id = req.auth?.id;
     const company_id = await resolveInternalId(db, "companies", req.params.company_id);
     const userRole = req.auth?.role;
-    const userCompanyId = req.auth?.company_id;
+    const userCompanyId = await resolveRequesterCompanyId(req);
 
     if (!admin_id) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -598,9 +612,10 @@ exports.getMe = async (req, res) => {
 //================= GET COMPANY NAME =========================================
 exports.getCompanyName = async (req, res) => {
   try {
+    const companyId = await resolveRequesterCompanyId(req);
     const [rows] = await db.query(
       "SELECT id, company_name FROM companies WHERE id = ?",
-      [req.auth?.company_id],
+      [companyId],
     );
 
     if (!rows.length)
@@ -641,7 +656,8 @@ exports.getCompanyDashboardStats = async (req, res) => {
     if (req.auth?.role !== "warehouse_manager" && req.auth?.role !== "warehouse_user") {
       return res.status(403).json({ message: "Company admin access required" });
     } 
-    const companyId = req.auth?.company_id;
+    const companyId = await resolveRequesterCompanyId(req);
+    if (!companyId) return res.status(403).json({ message: "Company access required" });
 
     const [rows] = await db.query(
       `SELECT 
